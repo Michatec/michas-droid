@@ -1,6 +1,5 @@
 package nya.kitsunyan.foxydroid.widget
 
-import android.annotation.SuppressLint
 import android.graphics.Canvas
 import android.graphics.Rect
 import android.os.SystemClock
@@ -11,7 +10,6 @@ import androidx.recyclerview.widget.RecyclerView
 import nya.kitsunyan.foxydroid.utility.extension.resources.*
 import kotlin.math.*
 
-@SuppressLint("ClickableViewAccessibility")
 class RecyclerFastScroller(private val recyclerView: RecyclerView) {
   companion object {
     private const val TRANSITION_IN = 100L

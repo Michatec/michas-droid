@@ -31,8 +31,8 @@ fun Context.getDrawableCompat(resId: Int): Drawable {
   val drawable = if (!Android.sdk(24)) {
     val fileName = TypedValue().apply { resources.getValue(resId, this, true) }.string
     if (fileName.endsWith(".xml")) {
-      resources.getXml(resId).use {
-        val eventType = generateSequence { it.next() }
+      resources.getXml(resId).use { it ->
+          val eventType = generateSequence { it.next() }
           .find { it == XmlPullParser.START_TAG || it == XmlPullParser.END_DOCUMENT }
         if (eventType == XmlPullParser.START_TAG) {
           when (it.name) {
@@ -77,8 +77,7 @@ fun Resources.sizeScaled(size: Int): Int {
 }
 
 fun TextView.setTextSizeScaled(size: Int) {
-  val realSize = (size * resources.displayMetrics.scaledDensity).roundToInt()
-  setTextSize(TypedValue.COMPLEX_UNIT_PX, realSize.toFloat())
+  setTextSize(TypedValue.COMPLEX_UNIT_SP, size.toFloat())
 }
 
 fun ViewGroup.inflate(layoutResId: Int): View {

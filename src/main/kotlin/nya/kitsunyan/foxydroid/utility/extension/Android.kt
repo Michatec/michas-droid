@@ -34,8 +34,7 @@ val PackageInfo.singleSignature: Signature?
       if (signingInfo?.hasMultipleSigners() == false) signingInfo.apkContentsSigners
         ?.let { if (it.size == 1) it[0] else null } else null
     } else {
-      @Suppress("DEPRECATION")
-      signatures?.let { if (it.size == 1) it[0] else null }
+        null
     }
   }
 
@@ -55,11 +54,20 @@ object Android {
     return Build.VERSION.SDK_INT >= sdk
   }
 
+  object PendingIntent {
+    val FLAG_IMMUTABLE: Int
+      get() = if (sdk(23)) android.app.PendingIntent.FLAG_IMMUTABLE else 0
+
+  }
+
   object PackageManager {
-    // GET_SIGNATURES should always present for getPackageArchiveInfo
     val signaturesFlag: Int
-      get() = (if (sdk(28)) android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES else 0) or
-        @Suppress("DEPRECATION") android.content.pm.PackageManager.GET_SIGNATURES
+      get() = (if (sdk(28)) android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES else 0)
+  }
+
+  object ServiceInfo {
+    val FOREGROUND_SERVICE_TYPE_DATA_SYNC: Int
+      get() = if (sdk(29)) android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0
   }
 
   object Device {
@@ -68,7 +76,7 @@ object Android {
         return try {
           Class.forName("com.huawei.android.os.BuildEx")
           true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
           false
         }
       }

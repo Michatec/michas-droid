@@ -21,63 +21,63 @@ object RxUtils {
     }
   }
 
-  private fun <T, R> managedSingle(create: () -> T, cancel: (T) -> Unit, execute: (T) -> R): Single<R> {
+  private fun <T, R : Any> managedSingle(create: () -> T, cancel: (T) -> Unit, execute: (T) -> R): Single<R> {
     return Single.create {
-      val task = create()
-      val thread = Thread.currentThread()
-      val disposable = ManagedDisposable {
-        thread.interrupt()
-        cancel(task)
-      }
-      it.setDisposable(disposable)
-      if (!disposable.isDisposed) {
-        val result = try {
-          execute(task)
-        } catch (e: Throwable) {
-          Exceptions.throwIfFatal(e)
-          if (!disposable.isDisposed) {
-            try {
-              it.onError(e)
-            } catch (inner: Throwable) {
-              Exceptions.throwIfFatal(inner)
-              RxJavaPlugins.onError(CompositeException(e, inner))
+        val task = create()
+        val thread = Thread.currentThread()
+        val disposable = ManagedDisposable {
+            thread.interrupt()
+            cancel(task)
+        }
+        it.setDisposable(disposable)
+        if (!disposable.isDisposed) {
+            val result = try {
+                execute(task)
+            } catch (e: Throwable) {
+                Exceptions.throwIfFatal(e)
+                if (!disposable.isDisposed) {
+                    try {
+                        it.onError(e)
+                    } catch (inner: Throwable) {
+                        Exceptions.throwIfFatal(inner)
+                        RxJavaPlugins.onError(CompositeException(e, inner))
+                    }
+                }
+                null
             }
-          }
-          null
+            if (result != null && !disposable.isDisposed) {
+                it.onSuccess(result)
+            }
         }
-        if (result != null && !disposable.isDisposed) {
-          it.onSuccess(result)
-        }
-      }
     }
   }
 
-  fun <R> managedSingle(execute: () -> R): Single<R> {
-    return managedSingle({ Unit }, { }, { execute() })
-  }
+    fun <R : Any> managedSingle(execute: () -> R): Single<R> {
+        return managedSingle({ }, { }, { execute() })
+    }
 
   fun callSingle(create: () -> Call): Single<Response> {
     return managedSingle(create, Call::cancel, Call::execute)
   }
 
-  fun <T> querySingle(query: (CancellationSignal) -> T): Single<T> {
+  fun <T : Any> querySingle(query: (CancellationSignal?) -> T): Single<T> {
     return Single.create {
-      val cancellationSignal = CancellationSignal()
-      it.setCancellable {
-        try {
-          cancellationSignal.cancel()
-        } catch (e: OperationCanceledException) {
-          // Do nothing
+        val cancellationSignal = CancellationSignal()
+        it.setCancellable {
+            try {
+                cancellationSignal.cancel()
+            } catch (_: OperationCanceledException) {
+                // Do nothing
+            }
         }
-      }
-      val result = try {
-        query(cancellationSignal)
-      } catch (e: OperationCanceledException) {
-        null
-      }
-      if (result != null) {
-        it.onSuccess(result)
-      }
+        val result = try {
+            query(cancellationSignal)
+        } catch (_: OperationCanceledException) {
+            null
+        }
+        if (result != null) {
+            it.onSuccess(result)
+        }
     }
   }
 }

@@ -34,20 +34,28 @@ class RepositoriesAdapter(private val onClick: (Repository) -> Unit,
     return Database.RepositoryAdapter.transform(moveTo(position))
   }
 
-  override fun onCreateViewHolder(parent: ViewGroup, viewType: ViewType): RecyclerView.ViewHolder {
-    return ViewHolder(parent.inflate(R.layout.repository_item)).apply {
-      itemView.setOnClickListener { onClick(getRepository(adapterPosition)) }
-      enabled.setOnCheckedChangeListener { _, isChecked ->
-        if (listenSwitch) {
-          if (!onSwitch(getRepository(adapterPosition), isChecked)) {
-            listenSwitch = false
-            enabled.isChecked = !isChecked
-            listenSwitch = true
-          }
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: ViewType): RecyclerView.ViewHolder {
+        return ViewHolder(parent.inflate(R.layout.repository_item)).apply {
+            itemView.setOnClickListener {
+                val position = bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    onClick(getRepository(position))
+                }
+            }
+            enabled.setOnCheckedChangeListener { _, isChecked ->
+                if (listenSwitch) {
+                    val position = bindingAdapterPosition
+                    if (position != RecyclerView.NO_POSITION) {
+                        if (!onSwitch(getRepository(position), isChecked)) {
+                            listenSwitch = false
+                            enabled.isChecked = !isChecked
+                            listenSwitch = true
+                        }
+                    }
+                }
+            }
         }
-      }
     }
-  }
 
   override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
     holder as ViewHolder

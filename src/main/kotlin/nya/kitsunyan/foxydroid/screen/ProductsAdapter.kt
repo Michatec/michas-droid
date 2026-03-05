@@ -1,6 +1,8 @@
 package nya.kitsunyan.foxydroid.screen
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.database.Cursor
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
@@ -46,7 +48,7 @@ class ProductsAdapter(private val onClick: (ProductItem) -> Unit):
     init {
       itemView as FrameLayout
       val progressBar = ProgressBar(itemView.context)
-      itemView.addView(progressBar, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT,
+      (itemView as ViewGroup).addView(progressBar, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT,
         FrameLayout.LayoutParams.WRAP_CONTENT).apply { gravity = Gravity.CENTER })
       itemView.layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT,
         RecyclerView.LayoutParams.MATCH_PARENT)
@@ -59,11 +61,11 @@ class ProductsAdapter(private val onClick: (ProductItem) -> Unit):
 
     init {
       itemView as TextView
-      itemView.gravity = Gravity.CENTER
+      (itemView as TextView).gravity = Gravity.CENTER
       itemView.resources.sizeScaled(20).let { itemView.setPadding(it, it, it, it) }
-      itemView.typeface = TypefaceExtra.light
-      itemView.setTextColor(context.getColorFromAttr(android.R.attr.textColorPrimary))
-      itemView.setTextSizeScaled(20)
+      (itemView as TextView).typeface = TypefaceExtra.light
+      (itemView as TextView).setTextColor(context.getColorFromAttr(android.R.attr.textColorPrimary))
+      (itemView as TextView).setTextSizeScaled(20)
       itemView.layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT,
         RecyclerView.LayoutParams.MATCH_PARENT)
     }
@@ -75,18 +77,25 @@ class ProductsAdapter(private val onClick: (ProductItem) -> Unit):
       getProductItem(position + 1) else null
     when {
       currentItem != null && nextItem != null && currentItem.matchRank != nextItem.matchRank -> {
-        configuration.set(true, false, 0, 0)
+        configuration.set(needDivider = true, toTop = false, paddingStart = 0, paddingEnd = 0)
       }
       else -> {
-        configuration.set(true, false, context.resources.sizeScaled(72), 0)
+        configuration.set(
+            needDivider = true,
+            toTop = false,
+            paddingStart = context.resources.sizeScaled(72),
+            paddingEnd = 0
+        )
       }
     }
   }
 
   var repositories: Map<Long, Repository> = emptyMap()
     set(value) {
-      field = value
-      notifyDataSetChanged()
+      if (field != value) {
+        field = value
+        notifyItemRangeChanged(0, itemCount)
+      }
     }
 
   var emptyText: String = ""
@@ -94,7 +103,7 @@ class ProductsAdapter(private val onClick: (ProductItem) -> Unit):
       if (field != value) {
         field = value
         if (isEmpty) {
-          notifyDataSetChanged()
+          notifyItemChanged(0)
         }
       }
     }
@@ -123,7 +132,12 @@ class ProductsAdapter(private val onClick: (ProductItem) -> Unit):
   override fun onCreateViewHolder(parent: ViewGroup, viewType: ViewType): RecyclerView.ViewHolder {
     return when (viewType) {
       ViewType.PRODUCT -> ProductViewHolder(parent.inflate(R.layout.product_item)).apply {
-        itemView.setOnClickListener { onClick(getProductItem(adapterPosition)) }
+        itemView.setOnClickListener {
+          val position = bindingAdapterPosition
+          if (position != RecyclerView.NO_POSITION) {
+            onClick(getProductItem(position))
+          }
+        }
       }
       ViewType.LOADING -> LoadingViewHolder(parent.context)
       ViewType.EMPTY -> EmptyViewHolder(parent.context)
@@ -170,7 +184,7 @@ class ProductsAdapter(private val onClick: (ProductItem) -> Unit):
           }
         }
         val enabled = productItem.compatible || productItem.installedVersion.isNotEmpty()
-        sequenceOf(holder.name, holder.status, holder.summary).forEach { it.isEnabled = enabled }
+        sequenceOf(holder.name, holder.status, holder.summary).forEach { view -> view.isEnabled = enabled }
       }
       ViewType.LOADING -> {
         // Do nothing
@@ -179,6 +193,25 @@ class ProductsAdapter(private val onClick: (ProductItem) -> Unit):
         holder as EmptyViewHolder
         holder.text.text = emptyText
       }
-    }::class
+    }
+  }
+
+  @SuppressLint("NotifyDataSetChanged")
+  override fun onCursorChanged(oldCursor: Cursor?, newCursor: Cursor?) {
+    val oldSize = oldCursor?.count ?: 0
+    val newSize = newCursor?.count ?: 0
+
+    val oldIsVirtual = oldSize == 0
+    val newIsVirtual = newSize == 0
+
+    if (oldIsVirtual != newIsVirtual) {
+      notifyDataSetChanged()
+    } else if (oldIsVirtual) {
+      if (oldCursor != newCursor) {
+        notifyItemChanged(0)
+      }
+    } else {
+      super.onCursorChanged(oldCursor, newCursor)
+    }
   }
 }

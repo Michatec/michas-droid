@@ -9,6 +9,7 @@ import nya.kitsunyan.foxydroid.R
 import nya.kitsunyan.foxydroid.entity.ProductItem
 import nya.kitsunyan.foxydroid.utility.extension.android.*
 import java.net.Proxy
+import androidx.core.content.edit
 
 object Preferences {
   private lateinit var preferences: SharedPreferences
@@ -18,9 +19,13 @@ object Preferences {
   private val keys = sequenceOf(Key.AutoSync, Key.IncompatibleVersions, Key.ProxyHost, Key.ProxyPort, Key.ProxyType,
     Key.SortOrder, Key.Theme, Key.UpdateNotify, Key.UpdateUnstable).map { Pair(it.name, it) }.toMap()
 
+  private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, keyString ->
+    keys[keyString]?.let(subject::onNext)
+  }
+
   fun init(context: Context) {
     preferences = context.getSharedPreferences("${context.packageName}_preferences", Context.MODE_PRIVATE)
-    preferences.registerOnSharedPreferenceChangeListener { _, keyString -> keys[keyString]?.let(subject::onNext) }
+    preferences.registerOnSharedPreferenceChangeListener(listener)
   }
 
   val observable: Observable<Key<*>>
@@ -38,7 +43,7 @@ object Preferences {
       }
 
       override fun set(preferences: SharedPreferences, key: String, value: Boolean) {
-        preferences.edit().putBoolean(key, value).apply()
+        preferences.edit(commit = true) { putBoolean(key, value) }
       }
     }
 
@@ -48,7 +53,7 @@ object Preferences {
       }
 
       override fun set(preferences: SharedPreferences, key: String, value: Int) {
-        preferences.edit().putInt(key, value).apply()
+        preferences.edit(commit = true) { putInt(key, value) }
       }
     }
 
@@ -58,7 +63,7 @@ object Preferences {
       }
 
       override fun set(preferences: SharedPreferences, key: String, value: String) {
-        preferences.edit().putString(key, value).apply()
+        preferences.edit(commit = true) { putString(key, value) }
       }
     }
 
@@ -69,7 +74,7 @@ object Preferences {
       }
 
       override fun set(preferences: SharedPreferences, key: String, value: T) {
-        preferences.edit().putString(key, value.valueString).apply()
+        preferences.edit(commit = true) { putString(key, value.valueString) }
       }
     }
   }

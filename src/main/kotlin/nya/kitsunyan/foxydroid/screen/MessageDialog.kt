@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Parcel
+import androidx.core.os.BundleCompat
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.FragmentManager
 import nya.kitsunyan.foxydroid.R
@@ -14,6 +15,7 @@ import nya.kitsunyan.foxydroid.utility.KParcelable
 import nya.kitsunyan.foxydroid.utility.PackageItemResolver
 import nya.kitsunyan.foxydroid.utility.extension.android.*
 import nya.kitsunyan.foxydroid.utility.extension.text.*
+import androidx.core.net.toUri
 
 class MessageDialog(): DialogFragment() {
   companion object {
@@ -36,7 +38,7 @@ class MessageDialog(): DialogFragment() {
 
       companion object {
         @Suppress("unused") @JvmField val CREATOR = KParcelable.creator {
-          val uri = Uri.parse(it.readString()!!)
+          val uri = it.readString()!!.toUri()
           Link(uri)
         }
       }
@@ -124,7 +126,8 @@ class MessageDialog(): DialogFragment() {
 
   override fun onCreateDialog(savedInstanceState: Bundle?): AlertDialog {
     val dialog = AlertDialog.Builder(requireContext())
-    when (val message = requireArguments().getParcelable<Message>(EXTRA_MESSAGE)!!) {
+    val message = BundleCompat.getParcelable(requireArguments(), EXTRA_MESSAGE, Message::class.java)!!
+    when (message) {
       is Message.DeleteRepositoryConfirm -> {
         dialog.setTitle(R.string.confirmation)
         dialog.setMessage(R.string.delete_repository_DESC)
@@ -157,7 +160,7 @@ class MessageDialog(): DialogFragment() {
             val permissionGroupInfo = packageManager.getPermissionGroupInfo(message.group, 0)
             PackageItemResolver.loadLabel(requireContext(), localCache, permissionGroupInfo)
               ?.nullIfEmpty()?.let { if (it == message.group) null else it }
-          } catch (e: Exception) {
+          } catch (_: Exception) {
             null
           }
           name ?: getString(R.string.unknown)
@@ -169,7 +172,7 @@ class MessageDialog(): DialogFragment() {
             val permissionInfo = packageManager.getPermissionInfo(permission, 0)
             PackageItemResolver.loadDescription(requireContext(), localCache, permissionInfo)
               ?.nullIfEmpty()?.let { if (it == permission) null else it }
-          } catch (e: Exception) {
+          } catch (_: Exception) {
             null
           }
           description?.let { builder.append(it).append("\n\n") }

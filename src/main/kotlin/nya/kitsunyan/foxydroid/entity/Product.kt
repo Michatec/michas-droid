@@ -156,8 +156,8 @@ data class Product(val repositoryId: Long, val packageName: String, val name: St
       var donates = emptyList<Donate>()
       var screenshots = emptyList<Screenshot>()
       var releases = emptyList<Release>()
-      parser.forEachKey {
-        when {
+      parser.forEachKey { it ->
+          when {
           it.string("packageName") -> packageName = valueAsString
           it.string("name") -> name = valueAsString
           it.string("summary") -> summary = valueAsString
@@ -213,7 +213,7 @@ data class Product(val repositoryId: Long, val packageName: String, val name: St
                 else -> skipChildren()
               }
             }
-            Screenshot.Type.values().find { it.jsonName == type }?.let { Screenshot(locale, it, path) }
+            Screenshot.Type.entries.find { it.jsonName == type }?.let { Screenshot(locale, it, path) }
           }
           it.array("releases") -> releases = collectNotNull(JsonToken.START_OBJECT, Release.Companion::deserialize)
           else -> skipChildren()

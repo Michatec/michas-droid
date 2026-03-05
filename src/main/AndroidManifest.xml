@@ -1,26 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest
-  xmlns:android="http://schemas.android.com/apk/res/android"
-  xmlns:tools="http://schemas.android.com/tools"
-  package="nya.kitsunyan.foxydroid">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
   <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
   <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
+  <queries>
+    <intent>
+      <action android:name="android.intent.action.MAIN" />
+      <category android:name="android.intent.category.LAUNCHER" />
+    </intent>
+  </queries>
 
   <application
     android:name=".MainApplication"
     android:label="@string/application_name"
     android:icon="@mipmap/ic_launcher"
     android:supportsRtl="true"
-    android:allowBackup="false"
-    android:theme="@style/Theme.Main.Light"
-    tools:ignore="GoogleAppIndexingWarning">
+    android:theme="@style/Theme.Main.Light">
 
     <receiver
-      android:name=".MainApplication$BootReceiver">
+      android:name=".MainApplication$BootReceiver"
+        android:exported="true">
 
       <intent-filter>
         <action android:name="android.intent.action.BOOT_COMPLETED" />
@@ -30,7 +37,8 @@
 
     <activity
       android:name=".MainActivity"
-      android:launchMode="singleTask"
+        android:exported="true"
+        android:launchMode="singleTask"
       android:windowSoftInputMode="adjustResize">
 
       <intent-filter>
@@ -52,7 +60,7 @@
         <data android:scheme="market" android:host="details" />
       </intent-filter>
 
-      <intent-filter>
+      <intent-filter android:autoVerify="true">
         <action android:name="android.intent.action.VIEW" />
         <category android:name="android.intent.category.DEFAULT" />
         <category android:name="android.intent.category.BROWSABLE" />
@@ -69,7 +77,8 @@
     </activity>
 
     <service
-      android:name=".service.SyncService" />
+      android:name=".service.SyncService"
+      android:foregroundServiceType="dataSync" />
 
     <service
       android:name=".service.SyncService$Job"
@@ -77,7 +86,8 @@
       android:permission="android.permission.BIND_JOB_SERVICE" />
 
     <service
-      android:name=".service.DownloadService" />
+      android:name=".service.DownloadService"
+      android:foregroundServiceType="dataSync" />
 
     <receiver
       android:name=".service.DownloadService$Receiver" />

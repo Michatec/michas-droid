@@ -113,15 +113,13 @@ class RepositoryFragment(): ScreenFragment() {
         layout.addTitleText(R.string.name, repository.name)
         layout.addTitleText(R.string.description, repository.description.replace('\n', ' '))
         layout.addTitleText(R.string.last_update, run {
-          val lastUpdated = repository.updated
-          if (lastUpdated > 0L) {
-            val date = Date(repository.updated)
-            val format = if (DateUtils.isToday(date.time)) DateUtils.FORMAT_SHOW_TIME else
-              DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_SHOW_DATE
-            DateUtils.formatDateTime(layout.context, date.time, format)
-          } else {
-            getString(R.string.unknown)
-          }
+          repository.updated
+            run {
+                val date = Date(repository.updated)
+                val format = if (DateUtils.isToday(date.time)) DateUtils.FORMAT_SHOW_TIME else
+                    DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_SHOW_DATE
+                DateUtils.formatDateTime(layout.context, date.time, format)
+            }
         })
         if (repository.enabled && (repository.lastModified.isNotEmpty() || repository.entityTag.isNotEmpty())) {
           layout.addTitleText(R.string.number_of_applications,
@@ -139,7 +137,7 @@ class RepositoryFragment(): ScreenFragment() {
         }
       } else {
         val fingerprint = SpannableStringBuilder(repository.fingerprint.windowed(2, 2, false)
-          .take(32).joinToString(separator = " ") { it.toUpperCase(Locale.US) })
+          .take(32).joinToString(separator = " ") { it.uppercase(Locale.US) })
         fingerprint.setSpan(TypefaceSpan("monospace"), 0, fingerprint.length,
           SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE)
         layout.addTitleText(R.string.fingerprint, fingerprint)
@@ -158,9 +156,7 @@ class RepositoryFragment(): ScreenFragment() {
     }
   }
 
-  internal fun onDeleteConfirm() {
-    if (syncConnection.binder?.deleteRepository(repositoryId) == true) {
-      requireActivity().onBackPressed()
-    }
-  }
+    internal fun onDeleteConfirm() {if (syncConnection.binder?.deleteRepository(repositoryId) == true) {
+        screenActivity.onBackPressedDispatcher.onBackPressed()
+    }}
 }

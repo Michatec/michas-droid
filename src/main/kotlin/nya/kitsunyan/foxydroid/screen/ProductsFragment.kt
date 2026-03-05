@@ -6,6 +6,7 @@ import android.os.Parcelable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.os.BundleCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
@@ -90,17 +91,21 @@ class ProductsFragment(): ScreenFragment(), CursorOwner.Callback {
     super.onViewCreated(view, savedInstanceState)
 
     currentSearchQuery = savedInstanceState?.getString(STATE_CURRENT_SEARCH_QUERY).orEmpty()
-    currentSection = savedInstanceState?.getParcelable(STATE_CURRENT_SECTION) ?: ProductItem.Section.All
+    currentSection = savedInstanceState?.let { bundle ->
+      BundleCompat.getParcelable(bundle, STATE_CURRENT_SECTION, ProductItem.Section::class.java)
+    } ?: ProductItem.Section.All
     currentOrder = savedInstanceState?.getString(STATE_CURRENT_ORDER)
       ?.let(ProductItem.Order::valueOf) ?: ProductItem.Order.NAME
-    layoutManagerState = savedInstanceState?.getParcelable(STATE_LAYOUT_MANAGER)
+    layoutManagerState = savedInstanceState?.let { bundle ->
+      BundleCompat.getParcelable(bundle, STATE_LAYOUT_MANAGER, Parcelable::class.java)
+    }
 
     screenActivity.cursorOwner.attach(this, request)
     repositoriesDisposable = Observable.just(Unit)
       .concatWith(Database.observable(Database.Subject.Repositories))
       .observeOn(Schedulers.io())
-      .flatMapSingle { RxUtils.querySingle { Database.RepositoryAdapter.getAll(it) } }
-      .map { it.asSequence().map { Pair(it.id, it) }.toMap() }
+      .flatMapSingle { RxUtils.querySingle { signal -> Database.RepositoryAdapter.getAll(signal) } }
+      .map { result -> result.asSequence().map { Pair(it.id, it) }.toMap() }
       .observeOn(AndroidSchedulers.mainThread())
       .subscribe { (recyclerView?.adapter as? ProductsAdapter)?.repositories = it }
   }

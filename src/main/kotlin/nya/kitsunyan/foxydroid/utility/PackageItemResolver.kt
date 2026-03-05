@@ -40,7 +40,7 @@ object PackageItemResolver {
               @Suppress("DEPRECATION")
               resources.updateConfiguration(context.resources.configuration, null)
               resources
-            } catch (e: Exception) {
+            } catch (_: Exception) {
               null
             }
             resources?.let { localCache.resources[packageName] = it }

@@ -1,10 +1,10 @@
 package nya.kitsunyan.foxydroid.entity
 
-import android.net.Uri
 import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.core.JsonToken
 import nya.kitsunyan.foxydroid.utility.extension.json.*
+import androidx.core.net.toUri
 
 data class Release(val selected: Boolean, val version: String, val versionCode: Long,
   val added: Long, val size: Long, val minSdkVersion: Int, val targetSdkVersion: Int, val maxSdkVersion: Int,
@@ -24,7 +24,7 @@ data class Release(val selected: Boolean, val version: String, val versionCode: 
     get() = "$versionCode.$hash"
 
   fun getDownloadUrl(repository: Repository): String {
-    return Uri.parse(repository.address).buildUpon().appendPath(release).build().toString()
+    return repository.address.toUri().buildUpon().appendPath(release).build().toString()
   }
 
   val cacheFileName: String
@@ -102,8 +102,8 @@ data class Release(val selected: Boolean, val version: String, val versionCode: 
       var features = emptyList<String>()
       var platforms = emptyList<String>()
       var incompatibilities = emptyList<Incompatibility>()
-      parser.forEachKey {
-        when {
+      parser.forEachKey { it ->
+          when {
           it.boolean("selected") -> selected = valueAsBoolean
           it.string("version") -> version = valueAsString
           it.number("versionCode") -> versionCode = valueAsLong

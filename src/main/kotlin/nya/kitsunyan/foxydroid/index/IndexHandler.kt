@@ -17,7 +17,7 @@ class IndexHandler(private val repositoryId: Long, private val callback: Callbac
     private fun String.parseDate(): Long {
       return try {
         dateFormat.parse(this)?.time ?: 0L
-      } catch (e: Exception) {
+      } catch (_: Exception) {
         0L
       }
     }

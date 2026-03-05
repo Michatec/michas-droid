@@ -16,6 +16,7 @@ import nya.kitsunyan.foxydroid.entity.Repository
 import nya.kitsunyan.foxydroid.utility.extension.android.*
 import nya.kitsunyan.foxydroid.utility.extension.json.*
 import java.io.ByteArrayOutputStream
+import androidx.core.database.sqlite.transaction
 
 object Database {
   fun init(context: Context): Boolean {
@@ -170,6 +171,7 @@ object Database {
     }
 
     override fun onOpen(db: SQLiteDatabase) {
+      db.enableWriteAheadLogging()
       val create = handleTables(db, false, Schema.Repository)
       val updated = handleTables(db, create, Schema.Product, Schema.Category)
       db.execSQL("ATTACH DATABASE ':memory:' AS memory")
@@ -182,9 +184,11 @@ object Database {
   }
 
   private fun handleTables(db: SQLiteDatabase, recreate: Boolean, vararg tables: Table): Boolean {
-    val shouldRecreate = recreate || tables.any {
-      val sql = db.query("${it.databasePrefix}sqlite_master", columns = arrayOf("sql"),
-        selection = Pair("type = ? AND name = ?", arrayOf("table", it.innerName)))
+    val shouldRecreate = recreate || tables.any { it ->
+        val sql = db.query(
+            "${it.databasePrefix}sqlite_master", columns = arrayOf("sql"),
+            selection = Pair("type = ? AND name = ?", arrayOf("table", it.innerName))
+        )
         .use { it.firstOrNull()?.getString(0) }.orEmpty()
       it.formatCreateTable(it.innerName) != sql
     }
@@ -202,10 +206,12 @@ object Database {
   }
 
   private fun handleIndexes(db: SQLiteDatabase, vararg tables: Table) {
-    val shouldVacuum = tables.map {
-      val sqls = db.query("${it.databasePrefix}sqlite_master", columns = arrayOf("name", "sql"),
-        selection = Pair("type = ? AND tbl_name = ?", arrayOf("index", it.innerName)))
-        .use { it.asSequence().mapNotNull { it.getString(1)?.let { sql -> Pair(it.getString(0), sql) } }.toList() }
+    val shouldVacuum = tables.map { it ->
+        val sqls = db.query(
+            "${it.databasePrefix}sqlite_master", columns = arrayOf("name", "sql"),
+            selection = Pair("type = ? AND tbl_name = ?", arrayOf("index", it.innerName))
+        )
+        .use { it -> it.asSequence().mapNotNull { it.getString(1)?.let { sql -> Pair(it.getString(0), sql) } }.toList() }
         .filter { !it.first.startsWith("sqlite_") }
       val createIndexes = it.createIndexPairFormatted?.let { listOf(it) }.orEmpty()
       createIndexes.map { it.first } != sqls.map { it.second } && run {
@@ -224,11 +230,13 @@ object Database {
   }
 
   private fun dropOldTables(db: SQLiteDatabase, vararg neededTables: Table) {
-    val tables = db.query("sqlite_master", columns = arrayOf("name"),
-      selection = Pair("type = ?", arrayOf("table")))
-      .use { it.asSequence().mapNotNull { it.getString(0) }.toList() }
+    val tables = db.query(
+        "sqlite_master", columns = arrayOf("name"),
+        selection = Pair("type = ?", arrayOf("table"))
+    )
+      .use { it -> it.asSequence().mapNotNull { it.getString(0) }.toList() }
       .filter { !it.startsWith("sqlite_") && !it.startsWith("android_") }
-      .toSet() - neededTables.mapNotNull { if (it.memory) null else it.name }
+      .toSet() - neededTables.mapNotNull { if (it.memory) null else it.name }.toSet()
     if (tables.isNotEmpty()) {
       for (table in tables) {
         db.execSQL("DROP TABLE IF EXISTS $table")
@@ -281,9 +289,11 @@ object Database {
     return if (replace) replace(table, null, contentValues) else insert(table, null, contentValues)
   }
 
-  private fun SQLiteDatabase.query(table: String, columns: Array<String>? = null,
-    selection: Pair<String, Array<String>>? = null, orderBy: String? = null,
-    signal: CancellationSignal? = null): Cursor {
+  private fun SQLiteDatabase.query(
+      table: String, columns: Array<String>? = null,
+      selection: Pair<String, Array<String>>? = null, orderBy: String? = null,
+      signal: CancellationSignal? = null
+  ): Cursor {
     return query(false, table, columns, selection?.first, selection?.second, null, null, orderBy, null, signal)
   }
 
@@ -313,33 +323,40 @@ object Database {
       })
     }
 
-    fun put(repository: Repository): Repository {
+    fun put(repository: Repository): Long {
       val shouldReplace = repository.id >= 0L
       val newId = putWithoutNotification(repository, shouldReplace)
       val id = if (shouldReplace) repository.id else newId
       notifyChanged(Subject.Repositories, Subject.Repository(id), Subject.Products)
-      return if (newId != repository.id) repository.copy(id = newId) else repository
+      return id
     }
 
     fun get(id: Long): Repository? {
-      return db.query(Schema.Repository.name,
-        selection = Pair("${Schema.Repository.ROW_ID} = ? AND ${Schema.Repository.ROW_DELETED} == 0",
-          arrayOf(id.toString())))
+      return db.query(
+          Schema.Repository.name,
+          selection = Pair("${Schema.Repository.ROW_ID} = ? AND ${Schema.Repository.ROW_DELETED} == 0",
+            arrayOf(id.toString()))
+      )
         .use { it.firstOrNull()?.let(::transform) }
     }
 
     fun getAll(signal: CancellationSignal?): List<Repository> {
-      return db.query(Schema.Repository.name,
-        selection = Pair("${Schema.Repository.ROW_DELETED} == 0", emptyArray()),
-        signal = signal).use { it.asSequence().map(::transform).toList() }
+      return db.query(
+          Schema.Repository.name,
+          selection = Pair("${Schema.Repository.ROW_DELETED} == 0", emptyArray()),
+          signal = signal
+      ).use { it.asSequence().map(::transform).toList() }
     }
 
     fun getAllDisabledDeleted(signal: CancellationSignal?): Set<Pair<Long, Boolean>> {
-      return db.query(Schema.Repository.name,
-        columns = arrayOf(Schema.Repository.ROW_ID, Schema.Repository.ROW_DELETED),
-        selection = Pair("${Schema.Repository.ROW_ENABLED} == 0 OR ${Schema.Repository.ROW_DELETED} != 0", emptyArray()),
-        signal = signal).use { it.asSequence().map { Pair(it.getLong(it.getColumnIndex(Schema.Repository.ROW_ID)),
-        it.getInt(it.getColumnIndex(Schema.Repository.ROW_DELETED)) != 0) }.toSet() }
+      return db.query(
+          Schema.Repository.name,
+          columns = arrayOf(Schema.Repository.ROW_ID, Schema.Repository.ROW_DELETED),
+          selection = Pair("${Schema.Repository.ROW_ENABLED} == 0 OR ${Schema.Repository.ROW_DELETED} != 0", emptyArray()),
+          signal = signal
+      ).use { it ->
+          it.asSequence().map { Pair(it.getLong(it.getColumnIndexOrThrow(Schema.Repository.ROW_ID)),
+        it.getInt(it.getColumnIndexOrThrow(Schema.Repository.ROW_DELETED)) != 0) }.toSet() }
     }
 
     fun markAsDeleted(id: Long) {
@@ -350,8 +367,8 @@ object Database {
     }
 
     fun cleanup(pairs: Set<Pair<Long, Boolean>>) {
-      val result = pairs.windowed(10, 10, true).map {
-        val idsString = it.joinToString(separator = ", ") { it.first.toString() }
+      val result = pairs.windowed(10, 10, true).map { it ->
+          val idsString = it.joinToString(separator = ", ") { it.first.toString() }
         val productsCount = db.delete(Schema.Product.name,
           "${Schema.Product.ROW_REPOSITORY_ID} IN ($idsString)", null)
         val categoriesCount = db.delete(Schema.Category.name,
@@ -369,28 +386,34 @@ object Database {
     }
 
     fun query(signal: CancellationSignal?): Cursor {
-      return db.query(Schema.Repository.name,
-        selection = Pair("${Schema.Repository.ROW_DELETED} == 0", emptyArray()),
-        signal = signal).observable(Subject.Repositories)
+      return db.query(
+          Schema.Repository.name,
+          selection = Pair("${Schema.Repository.ROW_DELETED} == 0", emptyArray()),
+          signal = signal
+      ).observable(Subject.Repositories)
     }
 
     fun transform(cursor: Cursor): Repository {
-      return cursor.getBlob(cursor.getColumnIndex(Schema.Repository.ROW_DATA))
-        .jsonParse { Repository.deserialize(cursor.getLong(cursor.getColumnIndex(Schema.Repository.ROW_ID)), it) }
+      return cursor.getBlob(cursor.getColumnIndexOrThrow(Schema.Repository.ROW_DATA))
+        .jsonParse { Repository.deserialize(cursor.getLong(cursor.getColumnIndexOrThrow(Schema.Repository.ROW_ID)), it) }
     }
   }
 
   object ProductAdapter {
     fun get(packageName: String, signal: CancellationSignal?): List<Product> {
-      return db.query(Schema.Product.name,
-        columns = arrayOf(Schema.Product.ROW_REPOSITORY_ID, Schema.Product.ROW_DESCRIPTION, Schema.Product.ROW_DATA),
-        selection = Pair("${Schema.Product.ROW_PACKAGE_NAME} = ?", arrayOf(packageName)),
-        signal = signal).use { it.asSequence().map(::transform).toList() }
+      return db.query(
+          Schema.Product.name,
+          columns = arrayOf(Schema.Product.ROW_REPOSITORY_ID, Schema.Product.ROW_DESCRIPTION, Schema.Product.ROW_DATA),
+          selection = Pair("${Schema.Product.ROW_PACKAGE_NAME} = ?", arrayOf(packageName)),
+          signal = signal
+      ).use { it.asSequence().map(::transform).toList() }
     }
 
     fun getCount(repositoryId: Long): Int {
-      return db.query(Schema.Product.name, columns = arrayOf("COUNT (*)"),
-        selection = Pair("${Schema.Product.ROW_REPOSITORY_ID} = ?", arrayOf(repositoryId.toString())))
+      return db.query(
+          Schema.Product.name, columns = arrayOf("COUNT (*)"),
+          selection = Pair("${Schema.Product.ROW_REPOSITORY_ID} = ?", arrayOf(repositoryId.toString()))
+      )
         .use { it.firstOrNull()?.getInt(0) ?: 0 }
     }
 
@@ -464,28 +487,28 @@ object Database {
         ProductItem.Order.NAME -> Unit
         ProductItem.Order.DATE_ADDED -> builder += "product.${Schema.Product.ROW_ADDED} DESC,"
         ProductItem.Order.LAST_UPDATE -> builder += "product.${Schema.Product.ROW_UPDATED} DESC,"
-      }::class
+      }
       builder += "product.${Schema.Product.ROW_NAME} COLLATE LOCALIZED ASC"
 
       return builder.query(db, signal).observable(Subject.Products)
     }
 
     private fun transform(cursor: Cursor): Product {
-      return cursor.getBlob(cursor.getColumnIndex(Schema.Product.ROW_DATA))
-        .jsonParse { Product.deserialize(cursor.getLong(cursor.getColumnIndex(Schema.Product.ROW_REPOSITORY_ID)),
-          cursor.getString(cursor.getColumnIndex(Schema.Product.ROW_DESCRIPTION)), it) }
+      return cursor.getBlob(cursor.getColumnIndexOrThrow(Schema.Product.ROW_DATA))
+        .jsonParse { Product.deserialize(cursor.getLong(cursor.getColumnIndexOrThrow(Schema.Product.ROW_REPOSITORY_ID)),
+          cursor.getString(cursor.getColumnIndexOrThrow(Schema.Product.ROW_DESCRIPTION)), it) }
     }
 
     fun transformItem(cursor: Cursor): ProductItem {
-      return cursor.getBlob(cursor.getColumnIndex(Schema.Product.ROW_DATA_ITEM))
-        .jsonParse { ProductItem.deserialize(cursor.getLong(cursor.getColumnIndex(Schema.Product.ROW_REPOSITORY_ID)),
-          cursor.getString(cursor.getColumnIndex(Schema.Product.ROW_PACKAGE_NAME)),
-          cursor.getString(cursor.getColumnIndex(Schema.Product.ROW_NAME)),
-          cursor.getString(cursor.getColumnIndex(Schema.Product.ROW_SUMMARY)),
-          cursor.getString(cursor.getColumnIndex(Schema.Installed.ROW_VERSION)).orEmpty(),
-          cursor.getInt(cursor.getColumnIndex(Schema.Product.ROW_COMPATIBLE)) != 0,
-          cursor.getInt(cursor.getColumnIndex(Schema.Synthetic.ROW_CAN_UPDATE)) != 0,
-          cursor.getInt(cursor.getColumnIndex(Schema.Synthetic.ROW_MATCH_RANK)), it) }
+      return cursor.getBlob(cursor.getColumnIndexOrThrow(Schema.Product.ROW_DATA_ITEM))
+        .jsonParse { ProductItem.deserialize(cursor.getLong(cursor.getColumnIndexOrThrow(Schema.Product.ROW_REPOSITORY_ID)),
+          cursor.getString(cursor.getColumnIndexOrThrow(Schema.Product.ROW_PACKAGE_NAME)),
+          cursor.getString(cursor.getColumnIndexOrThrow(Schema.Product.ROW_NAME)),
+          cursor.getString(cursor.getColumnIndexOrThrow(Schema.Product.ROW_SUMMARY)),
+          cursor.getString(cursor.getColumnIndexOrThrow(Schema.Installed.ROW_VERSION)).orEmpty(),
+          cursor.getInt(cursor.getColumnIndexOrThrow(Schema.Product.ROW_COMPATIBLE)) != 0,
+          cursor.getInt(cursor.getColumnIndexOrThrow(Schema.Synthetic.ROW_CAN_UPDATE)) != 0,
+          cursor.getInt(cursor.getColumnIndexOrThrow(Schema.Synthetic.ROW_MATCH_RANK)), it) }
     }
   }
 
@@ -500,18 +523,21 @@ object Database {
         WHERE repository.${Schema.Repository.ROW_ENABLED} != 0 AND
         repository.${Schema.Repository.ROW_DELETED} == 0"""
 
-      return builder.query(db, signal).use { it.asSequence()
-        .map { it.getString(it.getColumnIndex(Schema.Category.ROW_NAME)) }.toSet() }
+      return builder.query(db, signal).use { it ->
+          it.asSequence()
+        .map { it.getString(it.getColumnIndexOrThrow(Schema.Category.ROW_NAME)) }.toSet() }
     }
   }
 
   object InstalledAdapter {
     fun get(packageName: String, signal: CancellationSignal?): InstalledItem? {
-      return db.query(Schema.Installed.name,
-        columns = arrayOf(Schema.Installed.ROW_PACKAGE_NAME, Schema.Installed.ROW_VERSION,
-          Schema.Installed.ROW_VERSION_CODE, Schema.Installed.ROW_SIGNATURE),
-        selection = Pair("${Schema.Installed.ROW_PACKAGE_NAME} = ?", arrayOf(packageName)),
-        signal = signal).use { it.firstOrNull()?.let(::transform) }
+      return db.query(
+          Schema.Installed.name,
+          columns = arrayOf(Schema.Installed.ROW_PACKAGE_NAME, Schema.Installed.ROW_VERSION,
+            Schema.Installed.ROW_VERSION_CODE, Schema.Installed.ROW_SIGNATURE),
+          selection = Pair("${Schema.Installed.ROW_PACKAGE_NAME} = ?", arrayOf(packageName)),
+          signal = signal
+      ).use { it.firstOrNull()?.let(::transform) }
     }
 
     private fun put(installedItem: InstalledItem, notify: Boolean) {
@@ -529,13 +555,12 @@ object Database {
     fun put(installedItem: InstalledItem) = put(installedItem, true)
 
     fun putAll(installedItems: List<InstalledItem>) {
-      db.beginTransaction()
-      try {
-        db.delete(Schema.Installed.name, null, null)
-        installedItems.forEach { put(it, false) }
-        db.setTransactionSuccessful()
-      } finally {
-        db.endTransaction()
+      db.transaction {
+          try {
+              delete(Schema.Installed.name, null, null)
+              installedItems.forEach { put(it, false) }
+          } finally {
+          }
       }
     }
 
@@ -547,10 +572,10 @@ object Database {
     }
 
     private fun transform(cursor: Cursor): InstalledItem {
-      return InstalledItem(cursor.getString(cursor.getColumnIndex(Schema.Installed.ROW_PACKAGE_NAME)),
-        cursor.getString(cursor.getColumnIndex(Schema.Installed.ROW_VERSION)),
-        cursor.getLong(cursor.getColumnIndex(Schema.Installed.ROW_VERSION_CODE)),
-        cursor.getString(cursor.getColumnIndex(Schema.Installed.ROW_SIGNATURE)))
+      return InstalledItem(cursor.getString(cursor.getColumnIndexOrThrow(Schema.Installed.ROW_PACKAGE_NAME)),
+        cursor.getString(cursor.getColumnIndexOrThrow(Schema.Installed.ROW_VERSION)),
+        cursor.getLong(cursor.getColumnIndexOrThrow(Schema.Installed.ROW_VERSION_CODE)),
+        cursor.getString(cursor.getColumnIndexOrThrow(Schema.Installed.ROW_SIGNATURE)))
     }
   }
 
@@ -568,13 +593,12 @@ object Database {
     fun put(lock: Pair<String, Long>) = put(lock, true)
 
     fun putAll(locks: List<Pair<String, Long>>) {
-      db.beginTransaction()
-      try {
-        db.delete(Schema.Lock.name, null, null)
-        locks.forEach { put(it, false) }
-        db.setTransactionSuccessful()
-      } finally {
-        db.endTransaction()
+      db.transaction {
+          try {
+              delete(Schema.Lock.name, null, null)
+              locks.forEach { put(it, false) }
+          } finally {
+          }
       }
     }
 
@@ -596,60 +620,60 @@ object Database {
     }
 
     fun putTemporary(products: List<Product>) {
-      db.beginTransaction()
-      try {
-        for (product in products) {
-          // Format signatures like ".signature1.signature2." for easier select
-          val signatures = product.signatures.joinToString { ".$it" }
-            .let { if (it.isNotEmpty()) "$it." else "" }
-          db.insertOrReplace(true, Schema.Product.temporaryName, ContentValues().apply {
-            put(Schema.Product.ROW_REPOSITORY_ID, product.repositoryId)
-            put(Schema.Product.ROW_PACKAGE_NAME, product.packageName)
-            put(Schema.Product.ROW_NAME, product.name)
-            put(Schema.Product.ROW_SUMMARY, product.summary)
-            put(Schema.Product.ROW_DESCRIPTION, product.description)
-            put(Schema.Product.ROW_ADDED, product.added)
-            put(Schema.Product.ROW_UPDATED, product.updated)
-            put(Schema.Product.ROW_VERSION_CODE, product.versionCode)
-            put(Schema.Product.ROW_SIGNATURES, signatures)
-            put(Schema.Product.ROW_COMPATIBLE, if (product.compatible) 1 else 0)
-            put(Schema.Product.ROW_DATA, jsonGenerate(product::serialize))
-            put(Schema.Product.ROW_DATA_ITEM, jsonGenerate(product.item()::serialize))
-          })
-          for (category in product.categories) {
-            db.insertOrReplace(true, Schema.Category.temporaryName, ContentValues().apply {
-              put(Schema.Category.ROW_REPOSITORY_ID, product.repositoryId)
-              put(Schema.Category.ROW_PACKAGE_NAME, product.packageName)
-              put(Schema.Category.ROW_NAME, category)
-            })
+      db.transaction {
+          try {
+              for (product in products) {
+                  // Format signatures like ".signature1.signature2." for easier select
+                  val signatures = product.signatures.joinToString { ".$it" }
+                      .let { if (it.isNotEmpty()) "$it." else "" }
+                  insertOrReplace(true, Schema.Product.temporaryName, ContentValues().apply {
+                      put(Schema.Product.ROW_REPOSITORY_ID, product.repositoryId)
+                      put(Schema.Product.ROW_PACKAGE_NAME, product.packageName)
+                      put(Schema.Product.ROW_NAME, product.name)
+                      put(Schema.Product.ROW_SUMMARY, product.summary)
+                      put(Schema.Product.ROW_DESCRIPTION, product.description)
+                      put(Schema.Product.ROW_ADDED, product.added)
+                      put(Schema.Product.ROW_UPDATED, product.updated)
+                      put(Schema.Product.ROW_VERSION_CODE, product.versionCode)
+                      put(Schema.Product.ROW_SIGNATURES, signatures)
+                      put(Schema.Product.ROW_COMPATIBLE, if (product.compatible) 1 else 0)
+                      put(Schema.Product.ROW_DATA, jsonGenerate(product::serialize))
+                      put(Schema.Product.ROW_DATA_ITEM, jsonGenerate(product.item()::serialize))
+                  })
+                  for (category in product.categories) {
+                      insertOrReplace(true, Schema.Category.temporaryName, ContentValues().apply {
+                          put(Schema.Category.ROW_REPOSITORY_ID, product.repositoryId)
+                          put(Schema.Category.ROW_PACKAGE_NAME, product.packageName)
+                          put(Schema.Category.ROW_NAME, category)
+                      })
+                  }
+              }
+          } finally {
           }
-        }
-        db.setTransactionSuccessful()
-      } finally {
-        db.endTransaction()
       }
     }
 
     fun finishTemporary(repository: Repository, success: Boolean) {
       if (success) {
-        db.beginTransaction()
-        try {
-          db.delete(Schema.Product.name, "${Schema.Product.ROW_REPOSITORY_ID} = ?",
-            arrayOf(repository.id.toString()))
-          db.delete(Schema.Category.name, "${Schema.Category.ROW_REPOSITORY_ID} = ?",
-            arrayOf(repository.id.toString()))
-          db.execSQL("INSERT INTO ${Schema.Product.name} SELECT * FROM ${Schema.Product.temporaryName}")
-          db.execSQL("INSERT INTO ${Schema.Category.name} SELECT * FROM ${Schema.Category.temporaryName}")
-          RepositoryAdapter.putWithoutNotification(repository, true)
-          db.execSQL("DROP TABLE IF EXISTS ${Schema.Product.temporaryName}")
-          db.execSQL("DROP TABLE IF EXISTS ${Schema.Category.temporaryName}")
-          db.setTransactionSuccessful()
-        } finally {
-          db.endTransaction()
+        db.transaction {
+            try {
+                delete(
+                    Schema.Product.name, "${Schema.Product.ROW_REPOSITORY_ID} = ?",
+                    arrayOf(repository.id.toString())
+                )
+                delete(
+                    Schema.Category.name, "${Schema.Category.ROW_REPOSITORY_ID} = ?",
+                    arrayOf(repository.id.toString())
+                )
+                execSQL("INSERT INTO ${Schema.Product.name} SELECT * FROM ${Schema.Product.temporaryName}")
+                execSQL("INSERT INTO ${Schema.Category.name} SELECT * FROM ${Schema.Category.temporaryName}")
+                RepositoryAdapter.putWithoutNotification(repository, true)
+                execSQL("DROP TABLE IF EXISTS ${Schema.Product.temporaryName}")
+                execSQL("DROP TABLE IF EXISTS ${Schema.Category.temporaryName}")
+            } finally {
+            }
         }
-        if (success) {
           notifyChanged(Subject.Repositories, Subject.Repository(repository.id), Subject.Products)
-        }
       } else {
         db.execSQL("DROP TABLE IF EXISTS ${Schema.Product.temporaryName}")
         db.execSQL("DROP TABLE IF EXISTS ${Schema.Category.temporaryName}")

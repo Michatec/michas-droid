@@ -11,6 +11,7 @@ import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
 import android.view.ContextThemeWrapper
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import androidx.fragment.app.Fragment
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.core.Observable
@@ -123,11 +124,7 @@ class SyncService: ConnectionService<SyncService.Binder>() {
       return true
     }
 
-    fun isCurrentlySyncing(repositoryId: Long): Boolean {
-      return currentTask?.task?.repositoryId == repositoryId
-    }
-
-    fun deleteRepository(repositoryId: Long): Boolean {
+      fun deleteRepository(repositoryId: Long): Boolean {
       val repository = Database.RepositoryAdapter.get(repositoryId)
       return repository != null && run {
         setEnabled(repository, false)
@@ -220,7 +217,8 @@ class SyncService: ConnectionService<SyncService.Binder>() {
     .setColor(ContextThemeWrapper(this, R.style.Theme_Main_Light)
       .getColorFromAttr(android.R.attr.colorAccent).defaultColor)
     .addAction(0, getString(R.string.cancel), PendingIntent.getService(this, 0,
-      Intent(this, this::class.java).setAction(ACTION_CANCEL), PendingIntent.FLAG_UPDATE_CURRENT)) }
+      Intent(this, this::class.java).setAction(ACTION_CANCEL), PendingIntent.FLAG_UPDATE_CURRENT or
+        Android.PendingIntent.FLAG_IMMUTABLE)) }
 
   private fun publishForegroundState(force: Boolean, state: State) {
     if (force || currentTask?.lastState != state) {
@@ -267,7 +265,7 @@ class SyncService: ConnectionService<SyncService.Binder>() {
               setProgress(0, 0, true)
             }
           }::class
-        }.build())
+        }.build(), Android.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
       }
     }
   }
@@ -294,7 +292,7 @@ class SyncService: ConnectionService<SyncService.Binder>() {
           val unstable = Preferences[Preferences.Key.UpdateUnstable]
           lateinit var disposable: Disposable
           disposable = RepositoryUpdater
-            .update(repository, unstable) { stage, progress, total ->
+            .update(this, repository, unstable) { stage, progress, total ->
               if (!disposable.isDisposed) {
                 stateSubject.onNext(State.Syncing(repository.name, stage, progress, total))
               }
@@ -315,8 +313,16 @@ class SyncService: ConnectionService<SyncService.Binder>() {
       } else if (started != Started.NO) {
         if (hasUpdates && Preferences[Preferences.Key.UpdateNotify]) {
           val disposable = RxUtils
-            .querySingle { Database.ProductAdapter
-              .query(true, true, "", ProductItem.Section.All, ProductItem.Order.NAME, it)
+            .querySingle { it ->
+                Database.ProductAdapter
+              .query(
+                  installed = true,
+                  updates = true,
+                  searchQuery = "",
+                  section = ProductItem.Section.All,
+                  order = ProductItem.Order.NAME,
+                  signal = it
+              )
               .use { it.asSequence().map(Database.ProductAdapter::transformItem).toList() } }
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
@@ -335,7 +341,7 @@ class SyncService: ConnectionService<SyncService.Binder>() {
           val needStop = started == Started.MANUAL
           started = Started.NO
           if (needStop) {
-            stopForeground(true)
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
           }
         }
@@ -355,7 +361,8 @@ class SyncService: ConnectionService<SyncService.Binder>() {
       .setColor(ContextThemeWrapper(this, R.style.Theme_Main_Light)
         .getColorFromAttr(android.R.attr.colorAccent).defaultColor)
       .setContentIntent(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java)
-        .setAction(MainActivity.ACTION_UPDATES), PendingIntent.FLAG_UPDATE_CURRENT))
+        .setAction(MainActivity.ACTION_UPDATES), PendingIntent.FLAG_UPDATE_CURRENT or
+        Android.PendingIntent.FLAG_IMMUTABLE))
       .setStyle(NotificationCompat.InboxStyle().applyHack {
         for (productItem in productItems.take(maxUpdates)) {
           val builder = SpannableStringBuilder(productItem.name)

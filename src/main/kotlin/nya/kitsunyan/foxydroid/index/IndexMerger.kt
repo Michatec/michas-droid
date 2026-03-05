@@ -61,20 +61,22 @@ class IndexMerger(file: File): Closeable {
 
   fun forEach(repositoryId: Long, windowSize: Int, callback: (List<Product>, Int) -> Unit) {
     closeTransaction()
-    db.rawQuery("""SELECT product.description, product.data AS pd, releases.data AS rd FROM product
-      LEFT JOIN releases ON product.package_name = releases.package_name""", null)
-      ?.use { it.asSequence().map {
-        val description = it.getString(0)
-        val product = Json.factory.createParser(it.getBlob(1)).use {
-          it.nextToken()
-          Product.deserialize(repositoryId, description, it)
-        }
-        val releases = it.getBlob(2)?.let { Json.factory.createParser(it).use {
-          it.nextToken()
-          it.collectNotNull(JsonToken.START_OBJECT, Release.Companion::deserialize)
-        } }.orEmpty()
-        product.copy(releases = releases)
-      }.windowed(windowSize, windowSize, true).forEach { products -> callback(products, it.count) } }
+      db.rawQuery("""SELECT product.description, product.data AS pd, releases.data AS rd FROM product
+        LEFT JOIN releases ON product.package_name = releases.package_name""", null)
+          .use { it ->
+              it.asSequence().map { it ->
+                  val description = it.getString(0)
+              val product = Json.factory.createParser(it.getBlob(1)).use {
+                  it.nextToken()
+                  Product.deserialize(repositoryId, description, it)
+              }
+              val releases = it.getBlob(2)?.let { it ->
+                  Json.factory.createParser(it).use {
+                  it.nextToken()
+                  it.collectNotNull(JsonToken.START_OBJECT, Release.Companion::deserialize)
+              } }.orEmpty()
+              product.copy(releases = releases)
+          }.windowed(windowSize, windowSize, true).forEach { products -> callback(products, it.count) } }
   }
 
   override fun close() {

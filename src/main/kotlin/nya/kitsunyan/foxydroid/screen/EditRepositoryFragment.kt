@@ -5,7 +5,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
-import android.net.Uri
 import android.os.Bundle
 import android.text.Editable
 import android.text.Selection
@@ -42,6 +41,7 @@ import java.net.URL
 import java.nio.charset.Charset
 import java.util.Locale
 import kotlin.math.*
+import androidx.core.net.toUri
 
 class EditRepositoryFragment(): ScreenFragment() {
   companion object {
@@ -149,7 +149,7 @@ class EditRepositoryFragment(): ScreenFragment() {
 
       override fun afterTextChanged(s: Editable) {
         val inputString = s.toString()
-        val outputString = inputString.toUpperCase(Locale.US)
+        val outputString = inputString.uppercase(Locale.US)
           .filter(validChar).windowed(2, 2, true).take(32).joinToString(separator = " ")
         if (inputString != outputString) {
           val inputStart = logicalPosition(inputString, Selection.getSelectionStart(s))
@@ -161,19 +161,19 @@ class EditRepositoryFragment(): ScreenFragment() {
     })
 
     if (savedInstanceState == null) {
-      val repository = repositoryId?.let(Database.RepositoryAdapter::get)
+      val repository = repositoryId?.let { Database.RepositoryAdapter.get(it) }
       if (repository == null) {
         val clipboardManager = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val text = clipboardManager.primaryClip
           ?.let { if (it.itemCount > 0) it else null }
           ?.getItemAt(0)?.text?.toString().orEmpty()
         val (addressText, fingerprintText) = try {
-          val uri = Uri.parse(URL(text).toString())
+          val uri = URL(text).toString().toUri()
           val fingerprintText = uri.getQueryParameter("fingerprint")?.nullIfEmpty()
             ?: uri.getQueryParameter("FINGERPRINT")?.nullIfEmpty()
           Pair(uri.buildUpon().path(uri.path?.pathCropped)
             .query(null).fragment(null).build().toString(), fingerprintText)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
           Pair(null, null)
         }
         layout.address.setText(addressText?.nullIfEmpty() ?: layout.address.hint)
@@ -209,10 +209,26 @@ class EditRepositoryFragment(): ScreenFragment() {
       }
     }
 
-    layout.address.addTextChangedListener(SimpleTextWatcher { invalidateAddress() })
-    layout.fingerprint.addTextChangedListener(SimpleTextWatcher { invalidateFingerprint() })
-    layout.username.addTextChangedListener(SimpleTextWatcher { invalidateUsernamePassword() })
-    layout.password.addTextChangedListener(SimpleTextWatcher { invalidateUsernamePassword() })
+    layout.address.addTextChangedListener(object: TextWatcher {
+      override fun beforeTextChanged(s: CharSequence, start: Int, count: Int, after: Int) = Unit
+      override fun onTextChanged(s: CharSequence, start: Int, count: Int, after: Int) = Unit
+      override fun afterTextChanged(s: Editable) = invalidateAddress()
+    })
+    layout.fingerprint.addTextChangedListener(object: TextWatcher {
+      override fun beforeTextChanged(s: CharSequence, start: Int, count: Int, after: Int) = Unit
+      override fun onTextChanged(s: CharSequence, start: Int, count: Int, after: Int) = Unit
+      override fun afterTextChanged(s: Editable) = invalidateFingerprint()
+    })
+    layout.username.addTextChangedListener(object: TextWatcher {
+      override fun beforeTextChanged(s: CharSequence, start: Int, count: Int, after: Int) = Unit
+      override fun onTextChanged(s: CharSequence, start: Int, count: Int, after: Int) = Unit
+      override fun afterTextChanged(s: Editable) = invalidateUsernamePassword()
+    })
+    layout.password.addTextChangedListener(object: TextWatcher {
+      override fun beforeTextChanged(s: CharSequence, start: Int, count: Int, after: Int) = Unit
+      override fun onTextChanged(s: CharSequence, start: Int, count: Int, after: Int) = Unit
+      override fun afterTextChanged(s: Editable) = invalidateUsernamePassword()
+    })
 
     (layout.overlay.parent as ViewGroup).layoutTransition?.setDuration(200L)
     layout.overlay.background!!.apply {
@@ -230,14 +246,18 @@ class EditRepositoryFragment(): ScreenFragment() {
     repositoriesDisposable = Observable.just(Unit)
       .concatWith(Database.observable(Database.Subject.Repositories))
       .observeOn(Schedulers.io())
-      .flatMapSingle { RxUtils.querySingle { Database.RepositoryAdapter.getAll(it) } }
+      .flatMapSingle { RxUtils.querySingle { signal -> Database.RepositoryAdapter.getAll(signal) } }
       .observeOn(AndroidSchedulers.mainThread())
-      .subscribe {
-        takenAddresses = it.asSequence().filter { it.id != repositoryId }
+      .subscribe { result ->
+          takenAddresses = result.asSequence().filter { it.id != repositoryId }
           .flatMap { (it.mirrors + it.address).asSequence() }
           .map { it.withoutKnownPath }.toSet()
         invalidateAddress()
       }
+
+    invalidateAddress()
+    invalidateFingerprint()
+    invalidateUsernamePassword()
   }
 
   override fun onDestroyView() {
@@ -251,14 +271,6 @@ class EditRepositoryFragment(): ScreenFragment() {
     repositoriesDisposable = null
     checkDisposable?.dispose()
     checkDisposable = null
-  }
-
-  override fun onActivityCreated(savedInstanceState: Bundle?) {
-    super.onActivityCreated(savedInstanceState)
-
-    invalidateAddress()
-    invalidateFingerprint()
-    invalidateUsernamePassword()
   }
 
   private var addressError = false
@@ -328,7 +340,7 @@ class EditRepositoryFragment(): ScreenFragment() {
 
   private fun invalidateState() {
     val layout = layout!!
-    saveMenuItem!!.isEnabled = !addressError && !fingerprintError &&
+    saveMenuItem?.isEnabled = !addressError && !fingerprintError &&
       !usernamePasswordError && checkDisposable == null
     layout.apply { sequenceOf(address, addressMirror, fingerprint, username, password)
       .forEach { it.isEnabled = checkDisposable == null } }
@@ -346,21 +358,21 @@ class EditRepositoryFragment(): ScreenFragment() {
       val cropped = pathCropped
       val endsWith = checkPaths.asSequence().filter { it.isNotEmpty() }
         .sortedByDescending { it.length }.find { cropped.endsWith("/$it") }
-      return if (endsWith != null) cropped.substring(0, cropped.length - endsWith.length - 1) else cropped
+      return if (endsWith != null) cropped.take(cropped.length - endsWith.length - 1) else cropped
     }
 
   private fun normalizeAddress(address: String): String? {
     val uri = try {
       val uri = URI(address)
       if (uri.isAbsolute) uri.normalize() else null
-    } catch (e: Exception) {
+    } catch (_: Exception) {
       null
     }
     val path = uri?.path?.pathCropped
     return if (uri != null && path != null) {
       try {
         URI(uri.scheme, uri.userInfo, uri.host, uri.port, path, uri.query, uri.fragment).toString()
-      } catch (e: Exception) {
+      } catch (_: Exception) {
         null
       }
     } else {
@@ -394,7 +406,7 @@ class EditRepositoryFragment(): ScreenFragment() {
           .fold(Single.just("")) { oldAddressSingle, checkPath -> oldAddressSingle
             .flatMap { oldAddress ->
               if (oldAddress.isEmpty()) {
-                val builder = Uri.parse(address).buildUpon()
+                val builder = address.toUri().buildUpon()
                   .let { if (checkPath.isEmpty()) it else it.appendEncodedPath(checkPath) }
                 val newAddress = builder.build()
                 val indexAddress = builder.appendPath("index.jar").build()
@@ -413,71 +425,67 @@ class EditRepositoryFragment(): ScreenFragment() {
           .subscribe { result, throwable ->
             checkDisposable = null
             throwable?.printStackTrace()
-            val resultAddress = result?.let { if (it.isEmpty()) null else it } ?: address
-            val allow = resultAddress == address || run {
-              layout.address.setText(resultAddress)
-              invalidateAddress(resultAddress)
-              !addressError
-            }
-            if (allow) {
-              onSaveRepositoryProceedInvalidate(resultAddress, fingerprint, authentication)
+            val resultAddress = result?.let { it.ifEmpty { null } } ?: address
+            val allow = resultAddress == address || resultAddress == "$address/"
+            if (!allow) {
+                AlertDialog.Builder(requireContext())
+                  .setMessage(getString(R.string.address_redirect_FORMAT, resultAddress))
+                  .setPositiveButton(android.R.string.ok) { _, _ -> saveRepository(resultAddress, fingerprint, authentication) }
+                  .setNegativeButton(android.R.string.cancel, null)
+                  .show()
             } else {
-              invalidateState()
+                saveRepository(resultAddress, fingerprint, authentication)
             }
           }
-        invalidateState()
       } else {
-        onSaveRepositoryProceedInvalidate(address, fingerprint, authentication)
+        saveRepository(address, fingerprint, authentication)
       }
-    }
-  }
-
-  private fun onSaveRepositoryProceedInvalidate(address: String, fingerprint: String, authentication: String) {
-    val binder = syncConnection.binder
-    if (binder != null) {
-      val repositoryId = repositoryId
-      if (repositoryId != null && binder.isCurrentlySyncing(repositoryId)) {
-        MessageDialog(MessageDialog.Message.CantEditSyncing).show(childFragmentManager)
-        invalidateState()
-      } else {
-        val repository = repositoryId?.let(Database.RepositoryAdapter::get)
-          ?.edit(address, fingerprint, authentication)
-          ?: Repository.newRepository(address, fingerprint, authentication)
-        val changedRepository = Database.RepositoryAdapter.put(repository)
-        if (repositoryId == null && changedRepository.enabled) {
-          binder.sync(changedRepository)
-        }
-        requireActivity().onBackPressed()
-      }
-    } else {
       invalidateState()
     }
   }
 
-  private class SimpleTextWatcher(private val callback: (Editable) -> Unit): TextWatcher {
-    override fun beforeTextChanged(s: CharSequence, start: Int, count: Int, after: Int) = Unit
-    override fun onTextChanged(s: CharSequence, start: Int, count: Int, after: Int) = Unit
-    override fun afterTextChanged(s: Editable) = callback(s)
+  private fun saveRepository(address: String, fingerprint: String, authentication: String) {
+    val repository = repositoryId?.let { Database.RepositoryAdapter.get(it) }
+    if (repository != null) {
+      Database.RepositoryAdapter.put(repository.copy(address = address, fingerprint = fingerprint,
+        authentication = authentication))
+    } else {
+      val id = Database.RepositoryAdapter.put(Repository(
+          id = 0,
+          address = address,
+          mirrors = emptyList(),
+          name = "",
+          description = "",
+          version = 0,
+          enabled = true,
+          fingerprint = fingerprint,
+          lastModified = "",
+          entityTag = "",
+          updated = 0L,
+          timestamp = 0L,
+          authentication = authentication
+      ))
+      Database.RepositoryAdapter.get(id)?.let { syncConnection.binder?.sync(it) }
+    }
+    screenActivity.onBackPressedDispatcher.onBackPressed()
   }
 
   class SelectMirrorDialog(): DialogFragment() {
-    companion object {
-      private const val EXTRA_MIRRORS = "mirrors"
-    }
+    private val mirrors: List<String>
+      get() = requireArguments().getStringArrayList("mirrors")!!
 
     constructor(mirrors: List<String>): this() {
       arguments = Bundle().apply {
-        putStringArrayList(EXTRA_MIRRORS, ArrayList(mirrors))
+        putStringArrayList("mirrors", ArrayList(mirrors))
       }
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): AlertDialog {
-      val mirrors = requireArguments().getStringArrayList(EXTRA_MIRRORS)!!
       return AlertDialog.Builder(requireContext())
         .setTitle(R.string.select_mirror)
-        .setItems(mirrors.toTypedArray()) { _, position -> (parentFragment as EditRepositoryFragment)
-          .setMirror(mirrors[position]) }
-        .setNegativeButton(R.string.cancel, null)
+        .setItems(mirrors.toTypedArray()) { _, which ->
+          (parentFragment as EditRepositoryFragment).setMirror(mirrors[which])
+        }
         .create()
     }
   }

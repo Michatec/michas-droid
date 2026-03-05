@@ -22,7 +22,10 @@ import android.widget.LinearLayout
 import android.widget.SearchView
 import android.widget.TextView
 import android.widget.Toolbar
+import androidx.core.os.BundleCompat
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.adapter.FragmentStateAdapter
@@ -75,10 +78,10 @@ class TabsFragment: ScreenFragment() {
       if (field != value) {
         field = value
         val layout = layout
-        layout?.tabs?.let { (0 until it.childCount)
-          .forEach { index -> it.getChildAt(index)!!.isEnabled = !value } }
+        layout?.tabs?.let { tabs -> (0 until tabs.childCount)
+          .forEach { index -> tabs.getChildAt(index)!!.isEnabled = !value } }
         layout?.sectionIcon?.scaleY = if (value) -1f else 1f
-        if ((sectionsList?.parent as? View)?.height ?: 0 > 0) {
+        if (((sectionsList?.parent as? View)?.height ?: 0) > 0) {
           animateSectionsList()
         }
       }
@@ -89,8 +92,8 @@ class TabsFragment: ScreenFragment() {
   private var section: ProductItem.Section = ProductItem.Section.All
 
   private val syncConnection = Connection(SyncService::class.java, onBind = { _, _ ->
-    viewPager?.let {
-      val source = ProductsFragment.Source.values()[it.currentItem]
+    viewPager?.let { pager ->
+      val source = ProductsFragment.Source.entries[pager.currentItem]
       updateUpdateNotificationBlocker(source)
     }
   })
@@ -195,7 +198,7 @@ class TabsFragment: ScreenFragment() {
 
     layout.tabs.background = TabsBackgroundDrawable(layout.tabs.context,
       layout.tabs.layoutDirection == View.LAYOUT_DIRECTION_RTL)
-    ProductsFragment.Source.values().forEach {
+    ProductsFragment.Source.entries.forEach { source ->
       val tab = TextView(layout.tabs.context)
       val selectedColor = tab.context.getColorFromAttr(android.R.attr.textColorPrimary).defaultColor
       val normalColor = tab.context.getColorFromAttr(android.R.attr.textColorSecondary).defaultColor
@@ -205,25 +208,25 @@ class TabsFragment: ScreenFragment() {
         intArrayOf(selectedColor, normalColor)))
       tab.setTextSizeScaled(14)
       tab.isAllCaps = true
-      tab.text = getString(it.titleResId)
+      tab.text = getString(source.titleResId)
       tab.background = tab.context.getDrawableFromAttr(android.R.attr.selectableItemBackground)
-      tab.setOnClickListener { _ ->
-        setSelectedTab(it)
-        viewPager!!.setCurrentItem(it.ordinal, Utils.areAnimationsEnabled(tab.context))
+      tab.setOnClickListener {
+        setSelectedTab(source)
+        viewPager!!.setCurrentItem(source.ordinal, Utils.areAnimationsEnabled(tab.context))
       }
       layout.tabs.addView(tab, 0, LinearLayout.LayoutParams.MATCH_PARENT)
       (tab.layoutParams as LinearLayout.LayoutParams).weight = 1f
     }
 
-    showSections = savedInstanceState?.getByte(STATE_SHOW_SECTIONS)?.toInt() ?: 0 != 0
-    sections = savedInstanceState?.getParcelableArrayList<ProductItem.Section>(STATE_SECTIONS).orEmpty()
-    section = savedInstanceState?.getParcelable(STATE_SECTION) ?: ProductItem.Section.All
+    showSections = (savedInstanceState?.getByte(STATE_SHOW_SECTIONS)?.toInt() ?: 0) != 0
+    sections = savedInstanceState?.let { BundleCompat.getParcelableArrayList(it, STATE_SECTIONS, ProductItem.Section::class.java) }.orEmpty()
+    section = savedInstanceState?.let { BundleCompat.getParcelable(it, STATE_SECTION, ProductItem.Section::class.java) } ?: ProductItem.Section.All
     layout.sectionChange.setOnClickListener { showSections = sections
       .any { it !is ProductItem.Section.All } && !showSections }
 
     updateOrder()
-    sortOrderDisposable = Preferences.observable.subscribe {
-      if (it == Preferences.Key.SortOrder) {
+    sortOrderDisposable = Preferences.observable.subscribe { key ->
+      if (key == Preferences.Key.SortOrder) {
         updateOrder()
       }
     }
@@ -233,9 +236,8 @@ class TabsFragment: ScreenFragment() {
     viewPager = ViewPager2(content.context).apply {
       id = R.id.fragment_pager
       adapter = object: FragmentStateAdapter(this@TabsFragment) {
-        override fun getItemCount(): Int = ProductsFragment.Source.values().size
-        override fun createFragment(position: Int): Fragment = ProductsFragment(ProductsFragment
-          .Source.values()[position])
+        override fun getItemCount(): Int = ProductsFragment.Source.entries.size
+        override fun createFragment(position: Int): Fragment = ProductsFragment(ProductsFragment.Source.entries[position])
       }
       content.addView(this, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
       registerOnPageChangeCallback(pageChangeCallback)
@@ -245,16 +247,17 @@ class TabsFragment: ScreenFragment() {
     categoriesDisposable = Observable.just(Unit)
       .concatWith(Database.observable(Database.Subject.Products))
       .observeOn(Schedulers.io())
-      .flatMapSingle { RxUtils.querySingle { Database.CategoryAdapter.getAll(it) } }
+      .flatMapSingle { RxUtils.querySingle { signal -> Database.CategoryAdapter.getAll(signal) } }
       .observeOn(AndroidSchedulers.mainThread())
-      .subscribe { setSectionsAndUpdate(it.asSequence().sorted()
+      .subscribe { result -> setSectionsAndUpdate(result.asSequence().sorted()
         .map(ProductItem.Section::Category).toList(), null) }
     repositoriesDisposable = Observable.just(Unit)
       .concatWith(Database.observable(Database.Subject.Repositories))
       .observeOn(Schedulers.io())
-      .flatMapSingle { RxUtils.querySingle { Database.RepositoryAdapter.getAll(it) } }
+      .flatMapSingle { RxUtils.querySingle { signal -> Database.RepositoryAdapter.getAll(signal) } }
       .observeOn(AndroidSchedulers.mainThread())
-      .subscribe { setSectionsAndUpdate(null, it.asSequence().filter { it.enabled }
+      .subscribe { result ->
+          setSectionsAndUpdate(null, result.asSequence().filter { it.enabled }
         .map { ProductItem.Section.Repository(it.id, it.name) }.toList()) }
     updateSection()
 
@@ -264,10 +267,10 @@ class TabsFragment: ScreenFragment() {
       isMotionEventSplittingEnabled = false
       isVerticalScrollBarEnabled = false
       setHasFixedSize(true)
-      val adapter = SectionsAdapter({ sections }) {
+      val adapter = SectionsAdapter({ sections }) { newSection ->
         if (showSections) {
           showSections = false
-          section = it
+          section = newSection
           updateSection()
         }
       }
@@ -280,14 +283,13 @@ class TabsFragment: ScreenFragment() {
     }
     this.sectionsList = sectionsList
 
-    var lastContentHeight = -1
+    val lastContentHeight = -1
     content.viewTreeObserver.addOnGlobalLayoutListener {
       if (this.view != null) {
-        val initial = lastContentHeight <= 0
+        val initial = true
         val contentHeight = content.height
         if (lastContentHeight != contentHeight) {
-          lastContentHeight = contentHeight
-          if (initial) {
+            if (initial) {
             sectionsList.layoutParams.height = if (showSections) contentHeight else 0
             sectionsList.visibility = if (showSections) View.VISIBLE else View.GONE
             sectionsList.requestLayout()
@@ -340,7 +342,9 @@ class TabsFragment: ScreenFragment() {
     }
   }
 
+  @Deprecated("Deprecated in Java")
   override fun onAttachFragment(childFragment: Fragment) {
+    @Suppress("DEPRECATION")
     super.onAttachFragment(childFragment)
 
     if (view != null && childFragment is ProductsFragment) {
@@ -368,7 +372,7 @@ class TabsFragment: ScreenFragment() {
 
   private fun setSelectedTab(source: ProductsFragment.Source) {
     val layout = layout!!
-    (0 until layout.tabs.childCount).forEach { layout.tabs.getChildAt(it).isSelected = it == source.ordinal }
+    (0 until layout.tabs.childCount).forEach { index -> layout.tabs.getChildAt(index).isSelected = index == source.ordinal }
   }
 
   internal fun selectUpdates() = selectUpdatesInternal(true)
@@ -407,10 +411,20 @@ class TabsFragment: ScreenFragment() {
     val oldCategories = collectOldSections(categories)
     val oldRepositories = collectOldSections(repositories)
     if (oldCategories == null || oldRepositories == null) {
+      val oldSections = sections
       sections = listOf(ProductItem.Section.All) +
         (categories ?: oldCategories).orEmpty() +
         (repositories ?: oldRepositories).orEmpty()
+      val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+        override fun getOldListSize(): Int = oldSections.size
+        override fun getNewListSize(): Int = sections.size
+        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+          oldSections[oldItemPosition] == sections[newItemPosition]
+        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+          oldSections[oldItemPosition] == sections[newItemPosition]
+      })
       updateSection()
+      sectionsList?.adapter?.let { adapter -> diffResult.dispatchUpdatesTo(adapter) }
     }
   }
 
@@ -418,14 +432,19 @@ class TabsFragment: ScreenFragment() {
     if (section !in sections) {
       section = ProductItem.Section.All
     }
-    layout?.sectionName?.text = when (val section = section) {
+    layout?.sectionName?.text = when (val s = section) {
       is ProductItem.Section.All -> getString(R.string.all_applications)
-      is ProductItem.Section.Category -> section.name
-      is ProductItem.Section.Repository -> section.name
+      is ProductItem.Section.Category -> s.name
+      is ProductItem.Section.Repository -> s.name
     }
     layout?.sectionIcon?.visibility = if (sections.any { it !is ProductItem.Section.All }) View.VISIBLE else View.GONE
     productFragments.forEach { it.setSection(section) }
-    sectionsList?.adapter?.notifyDataSetChanged()
+    sectionsList?.adapter?.let { adapter ->
+      val index = sections.indexOf(section)
+      if (index >= 0) {
+        adapter.notifyItemRangeChanged(0, sections.size)
+      }
+    }
   }
 
   private fun animateSectionsList() {
@@ -440,16 +459,16 @@ class TabsFragment: ScreenFragment() {
       sectionsAnimator = ValueAnimator.ofFloat(value, target).apply {
         duration = (250 * abs(target - value)).toLong()
         interpolator = if (target >= 1f) AccelerateInterpolator(2f) else DecelerateInterpolator(2f)
-        addUpdateListener {
-          val newValue = animatedValue as Float
+        addUpdateListener { animator ->
+          val newValue = animator.animatedValue as Float
           sectionsList.apply {
-            val height = ((parent as View).height * newValue).toInt()
-            val visible = height > 0
-            if ((visibility == View.VISIBLE) != visible) {
+            val h = ((parent as View).height * newValue).toInt()
+            val visible = h > 0
+            if ((isVisible) != visible) {
               visibility = if (visible) View.VISIBLE else View.GONE
             }
-            if (layoutParams.height != height) {
-              layoutParams.height = height
+            if (layoutParams.height != h) {
+              layoutParams.height = h
               requestLayout()
             }
           }
@@ -464,30 +483,30 @@ class TabsFragment: ScreenFragment() {
 
   private val pageChangeCallback = object: ViewPager2.OnPageChangeCallback() {
     override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
-      val layout = layout!!
-      val fromSections = ProductsFragment.Source.values()[position].sections
+      val l = layout!!
+      val fromSections = ProductsFragment.Source.entries[position].sections
       val toSections = if (positionOffset <= 0f) fromSections else
-        ProductsFragment.Source.values()[position + 1].sections
+        ProductsFragment.Source.entries[position + 1].sections
       val offset = if (fromSections != toSections) {
         if (fromSections) 1f - positionOffset else positionOffset
       } else {
         if (fromSections) 1f else 0f
       }
-      (layout.tabs.background as TabsBackgroundDrawable)
-        .update(position + positionOffset, layout.tabs.childCount)
-      assert(layout.sectionLayout.childCount == 1)
-      val child = layout.sectionLayout.getChildAt(0)
-      val height = child.layoutParams.height
-      assert(height > 0)
-      val currentHeight = (offset * height).roundToInt()
-      if (layout.sectionLayout.layoutParams.height != currentHeight) {
-        layout.sectionLayout.layoutParams.height = currentHeight
-        layout.sectionLayout.requestLayout()
+      (l.tabs.background as TabsBackgroundDrawable)
+        .update(position + positionOffset, l.tabs.childCount)
+      assert(l.sectionLayout.childCount == 1)
+      val child = l.sectionLayout.getChildAt(0)
+      val h = child.layoutParams.height
+      assert(h > 0)
+      val currentHeight = (offset * h).roundToInt()
+      if (l.sectionLayout.layoutParams.height != currentHeight) {
+        l.sectionLayout.layoutParams.height = currentHeight
+        l.sectionLayout.requestLayout()
       }
     }
 
     override fun onPageSelected(position: Int) {
-      val source = ProductsFragment.Source.values()[position]
+      val source = ProductsFragment.Source.entries[position]
       updateUpdateNotificationBlocker(source)
       sortOrderMenu!!.first.isVisible = source.order
       syncRepositoriesMenuItem!!.setShowAsActionFlags(if (!source.order ||
@@ -499,7 +518,7 @@ class TabsFragment: ScreenFragment() {
     }
 
     override fun onPageScrollStateChanged(state: Int) {
-      val source = ProductsFragment.Source.values()[viewPager!!.currentItem]
+      val source = ProductsFragment.Source.entries[viewPager!!.currentItem]
       layout!!.sectionChange.isEnabled = state != ViewPager2.SCROLL_STATE_DRAGGING && source.sections
       if (state == ViewPager2.SCROLL_STATE_IDLE) {
         // onPageSelected can be called earlier than fragments created
@@ -509,7 +528,7 @@ class TabsFragment: ScreenFragment() {
   }
 
   private class TabsBackgroundDrawable(context: Context, private val rtl: Boolean): Drawable() {
-    private val height = context.resources.sizeScaled(2)
+    private val h = context.resources.sizeScaled(2)
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
       color = context.getColorFromAttr(android.R.attr.colorAccent).defaultColor
     }
@@ -525,15 +544,15 @@ class TabsFragment: ScreenFragment() {
 
     override fun draw(canvas: Canvas) {
       if (total > 0) {
-        val bounds = bounds
-        val width = bounds.width() / total.toFloat()
-        val x = width * position
+        val b = bounds
+        val w = b.width() / total.toFloat()
+        val x = w * position
         if (rtl) {
-          canvas.drawRect(bounds.right - width - x, (bounds.bottom - height).toFloat(),
-            bounds.right - x, bounds.bottom.toFloat(), paint)
+          canvas.drawRect(b.right - w - x, (b.bottom - h).toFloat(),
+            b.right - x, b.bottom.toFloat(), paint)
         } else {
-          canvas.drawRect(bounds.left + x, (bounds.bottom - height).toFloat(),
-            bounds.left + x + width, bounds.bottom.toFloat(), paint)
+          canvas.drawRect(b.left + x, (b.bottom - h).toFloat(),
+            b.left + x + w, b.bottom.toFloat(), paint)
         }
       }
     }
@@ -554,10 +573,10 @@ class TabsFragment: ScreenFragment() {
 
       init {
         itemView as TextView
-        itemView.gravity = Gravity.CENTER_VERTICAL
+        (itemView as TextView).gravity = Gravity.CENTER_VERTICAL
         itemView.resources.sizeScaled(16).let { itemView.setPadding(it, 0, it, 0) }
-        itemView.setTextColor(context.getColorFromAttr(android.R.attr.textColorPrimary))
-        itemView.setTextSizeScaled(16)
+        (itemView as TextView).setTextColor(context.getColorFromAttr(android.R.attr.textColorPrimary))
+        (itemView as TextView).setTextSizeScaled(16)
         itemView.background = context.getDrawableFromAttr(android.R.attr.selectableItemBackground)
         itemView.layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT,
           itemView.resources.sizeScaled(48))
@@ -570,10 +589,15 @@ class TabsFragment: ScreenFragment() {
       when {
         nextSection != null && currentSection.javaClass != nextSection.javaClass -> {
           val padding = context.resources.sizeScaled(16)
-          configuration.set(true, false, padding, padding)
+          configuration.set(
+              needDivider = true,
+              toTop = false,
+              paddingStart = padding,
+              paddingEnd = padding
+          )
         }
         else -> {
-          configuration.set(false, false, 0, 0)
+          configuration.set(needDivider = false, toTop = false, paddingStart = 0, paddingEnd = 0)
         }
       }
     }
@@ -587,7 +611,12 @@ class TabsFragment: ScreenFragment() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: ViewType): RecyclerView.ViewHolder {
       return SectionViewHolder(parent.context).apply {
-        itemView.setOnClickListener { onClick(sections()[adapterPosition]) }
+        itemView.setOnClickListener {
+          val pos = bindingAdapterPosition
+          if (pos != RecyclerView.NO_POSITION) {
+            onClick(sections()[pos])
+          }
+        }
       }
     }
 

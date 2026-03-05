@@ -18,11 +18,12 @@ import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toolbar
 import androidx.fragment.app.DialogFragment
-import androidx.fragment.app.Fragment
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.disposables.Disposable
 import nya.kitsunyan.foxydroid.R
 import nya.kitsunyan.foxydroid.content.Preferences
 import nya.kitsunyan.foxydroid.utility.extension.resources.*
+import androidx.core.view.isNotEmpty
 
 class PreferencesFragment: ScreenFragment() {
   private val preferences = mutableMapOf<Preferences.Key<*>, Preference<*>>()
@@ -46,11 +47,11 @@ class PreferencesFragment: ScreenFragment() {
     content.addView(scroll, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
     val scrollLayout = FrameLayout(content.context)
     scroll.addView(scrollLayout, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-    val preferences = LinearLayout(scrollLayout.context)
-    preferences.orientation = LinearLayout.VERTICAL
-    scrollLayout.addView(preferences, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+    val preferencesLayout = LinearLayout(scrollLayout.context)
+    preferencesLayout.orientation = LinearLayout.VERTICAL
+    scrollLayout.addView(preferencesLayout, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
 
-    preferences.addCategory(getString(R.string.updates)) {
+    preferencesLayout.addCategory(getString(R.string.updates)) {
       addEnumeration(Preferences.Key.AutoSync, getString(R.string.sync_repositories_automatically)) {
         when (it) {
           Preferences.AutoSync.Never -> getString(R.string.never)
@@ -63,7 +64,7 @@ class PreferencesFragment: ScreenFragment() {
       addSwitch(Preferences.Key.UpdateUnstable, getString(R.string.unstable_updates),
         getString(R.string.unstable_updates_summary))
     }
-    preferences.addCategory(getString(R.string.proxy)) {
+    preferencesLayout.addCategory(getString(R.string.proxy)) {
       addEnumeration(Preferences.Key.ProxyType, getString(R.string.proxy_type)) {
         when (it) {
           is Preferences.ProxyType.Direct -> getString(R.string.no_proxy)
@@ -74,7 +75,7 @@ class PreferencesFragment: ScreenFragment() {
       addEditString(Preferences.Key.ProxyHost, getString(R.string.proxy_host))
       addEditInt(Preferences.Key.ProxyPort, getString(R.string.proxy_port), 1 .. 65535)
     }
-    preferences.addCategory(getString(R.string.other)) {
+    preferencesLayout.addCategory(getString(R.string.other)) {
       addEnumeration(Preferences.Key.Theme, getString(R.string.theme)) {
         when (it) {
           is Preferences.Theme.System -> getString(R.string.system)
@@ -86,7 +87,9 @@ class PreferencesFragment: ScreenFragment() {
         getString(R.string.incompatible_versions_summary))
     }
 
-    disposable = Preferences.observable.subscribe(this::updatePreference)
+    disposable = Preferences.observable
+      .observeOn(AndroidSchedulers.mainThread())
+      .subscribe(this::updatePreference)
     updatePreference(null)
   }
 
@@ -138,12 +141,12 @@ class PreferencesFragment: ScreenFragment() {
     callback()
     val divider = addDivider(true)
     // Negative margin for last divider
-    (layoutParams as ViewGroup.MarginLayoutParams).bottomMargin = -divider.layoutParams.height
+    (divider.layoutParams as ViewGroup.MarginLayoutParams).bottomMargin = -divider.layoutParams.height
   }
 
   private fun <T> LinearLayout.addPreference(key: Preferences.Key<T>, title: String,
     summaryProvider: () -> String, dialogProvider: ((Context) -> AlertDialog)?): Preference<T> {
-    if (childCount > 0 && getChildAt(childCount - 1) !is TextView) {
+    if (isNotEmpty() && getChildAt(childCount - 1) !is TextView) {
       addDivider(false)
     }
     val preference = Preference(key, this@PreferencesFragment, this, title, summaryProvider, dialogProvider)
@@ -160,10 +163,10 @@ class PreferencesFragment: ScreenFragment() {
 
   private fun <T> LinearLayout.addEdit(key: Preferences.Key<T>, title: String, valueToString: (T) -> String,
     stringToValue: (String) -> T?, configureEdit: (EditText) -> Unit) {
-    addPreference(key, title, { valueToString(Preferences[key]) }) {
-      val scroll = ScrollView(it)
+    addPreference(key, title, { valueToString(Preferences[key]) }) { context ->
+      val scroll = ScrollView(context)
       scroll.resources.sizeScaled(20).let { scroll.setPadding(it, 0, it, 0) }
-      val edit = EditText(it)
+      val edit = EditText(context)
       configureEdit(edit)
       edit.id = android.R.id.edit
       edit.setTextSizeScaled(16)
@@ -173,12 +176,12 @@ class PreferencesFragment: ScreenFragment() {
       edit.setSelection(edit.text.length)
       edit.requestFocus()
       scroll.addView(edit, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-      AlertDialog.Builder(it)
+      AlertDialog.Builder(context)
         .setTitle(title)
         .setView(scroll)
         .setPositiveButton(R.string.ok) { _, _ ->
           val value = stringToValue(edit.text.toString()) ?: key.default.value
-          post { Preferences[key] = value }
+          Preferences[key] = value
         }
         .setNegativeButton(R.string.cancel, null)
         .create()
@@ -194,11 +197,10 @@ class PreferencesFragment: ScreenFragment() {
 
   private fun LinearLayout.addEditInt(key: Preferences.Key<Int>, title: String, range: IntRange?) {
     addEdit(key, title, { it.toString() }, { it.toIntOrNull() }) {
-      it.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+      it.inputType = InputType.TYPE_CLASS_NUMBER
       if (range != null) {
         it.filters = arrayOf(InputFilter { source, start, end, dest, dstart, dend ->
-          val value = (dest.substring(0, dstart) + source.substring(start, end) +
-            dest.substring(dend, dest.length)).toIntOrNull()
+          val value = "${dest.subSequence(0, dstart)}${source.subSequence(start, end)}${dest.subSequence(dend, dest.length)}".toIntOrNull()
           if (value != null && value in range) null else ""
         })
       }
@@ -207,14 +209,14 @@ class PreferencesFragment: ScreenFragment() {
 
   private fun <T: Preferences.Enumeration<T>> LinearLayout
     .addEnumeration(key: Preferences.Key<T>, title: String, valueToString: (T) -> String) {
-    addPreference(key, title, { valueToString(Preferences[key]) }) {
+    addPreference(key, title, { valueToString(Preferences[key]) }) { context ->
       val values = key.default.value.values
-      AlertDialog.Builder(it)
+      AlertDialog.Builder(context)
         .setTitle(title)
         .setSingleChoiceItems(values.map(valueToString).toTypedArray(),
           values.indexOf(Preferences[key])) { dialog, which ->
           dialog.dismiss()
-          post { Preferences[key] = values[which] }
+          Preferences[key] = values[which]
         }
         .setNegativeButton(R.string.cancel, null)
         .create()
@@ -222,7 +224,7 @@ class PreferencesFragment: ScreenFragment() {
   }
 
   private class Preference<T>(private val key: Preferences.Key<T>,
-    fragment: Fragment, parent: ViewGroup, titleText: String,
+    private val fragment: PreferencesFragment, parent: ViewGroup, titleText: String,
     private val summaryProvider: () -> String, private val dialogProvider: ((Context) -> AlertDialog)?) {
     val view = parent.inflate(R.layout.preference_item)
     val title = view.findViewById<TextView>(R.id.title)!!
@@ -276,10 +278,10 @@ class PreferencesFragment: ScreenFragment() {
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-      val preferences = (parentFragment as PreferencesFragment).preferences
+      val preferencesFragment = parentFragment as PreferencesFragment
       val key = requireArguments().getString(EXTRA_KEY)!!
-        .let { name -> preferences.keys.find { it.name == name }!! }
-      val preference = preferences[key]!!
+        .let { name -> preferencesFragment.preferences.keys.find { it.name == name }!! }
+      val preference = preferencesFragment.preferences[key]!!
       return preference.createDialog(requireContext())
     }
   }

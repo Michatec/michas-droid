@@ -1,9 +1,8 @@
-# Foxy Droid
+# Michas Droid
 
 Yet another F-Droid client.
 
-[![Release](https://img.shields.io/github/v/release/kitsunyan/foxy-droid)](https://github.com/kitsunyan/foxy-droid/releases)
-[![F-Droid](https://img.shields.io/f-droid/v/nya.kitsunyan.foxydroid)](https://f-droid.org/packages/nya.kitsunyan.foxydroid/)
+[![Release](https://img.shields.io/github/v/release/michatec/michas-droid)](https://github.com/michatec/michas-droid/releases/latest)
 
 ## Description
 
@@ -48,4 +47,4 @@ Run `./gradlew assembleRelease` to build the package, which can be installed usi
 
 ## License
 
-Foxy Droid is available under the terms of the GNU General Public License v3 or later. Copyright © 2020 kitsunyan.
+Michas Droid is available under the terms of the GNU General Public License v3 or later. Copyright © 2026 Michatec.

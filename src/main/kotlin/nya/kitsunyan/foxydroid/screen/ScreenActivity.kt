@@ -5,11 +5,13 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Parcel
-import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
 import android.widget.Toolbar
+import androidx.activity.OnBackPressedCallback
+import androidx.core.os.BundleCompat
+import androidx.core.view.WindowCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import nya.kitsunyan.foxydroid.R
@@ -72,8 +74,7 @@ abstract class ScreenActivity: FragmentActivity() {
     setTheme(Preferences[Preferences.Key.Theme].getResId(resources.configuration))
     super.onCreate(savedInstanceState)
 
-    window.decorView.systemUiVisibility = window.decorView.systemUiVisibility or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
-      View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+    WindowCompat.setDecorFitsSystemWindows(window, false)
     addContentView(FrameLayout(this).apply { id = R.id.main_content },
       ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
@@ -87,29 +88,39 @@ abstract class ScreenActivity: FragmentActivity() {
         .findFragmentByTag(CursorOwner::class.java.name) as CursorOwner
     }
 
-    savedInstanceState?.getParcelableArrayList<FragmentStackItem>(STATE_FRAGMENT_STACK)
-      ?.let { fragmentStack += it }
+    savedInstanceState?.let {
+      BundleCompat.getParcelableArrayList(it, STATE_FRAGMENT_STACK, FragmentStackItem::class.java)
+        ?.let { list -> fragmentStack += list }
+    }
     if (savedInstanceState == null) {
       replaceFragment(TabsFragment(), null)
       if ((intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0) {
         handleIntent(intent)
       }
     }
+
+    onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+      override fun handleOnBackPressed() {
+        val currentFragment = currentFragment
+        if (!(currentFragment is ScreenFragment && currentFragment.onBackPressed())) {
+          hideKeyboard()
+          if (!popFragment()) {
+            isEnabled = false
+            onBackPressedDispatcher.onBackPressed()
+            isEnabled = true
+          }
+        }
+      }
+    })
+
+    supportFragmentManager.addFragmentOnAttachListener { _, _ ->
+      hideKeyboard()
+    }
   }
 
   override fun onSaveInstanceState(outState: Bundle) {
     super.onSaveInstanceState(outState)
     outState.putParcelableArrayList(STATE_FRAGMENT_STACK, ArrayList(fragmentStack))
-  }
-
-  override fun onBackPressed() {
-    val currentFragment = currentFragment
-    if (!(currentFragment is ScreenFragment && currentFragment.onBackPressed())) {
-      hideKeyboard()
-      if (!popFragment()) {
-        super.onBackPressed()
-      }
-    }
   }
 
   private fun replaceFragment(fragment: Fragment, open: Boolean?) {
@@ -137,7 +148,7 @@ abstract class ScreenActivity: FragmentActivity() {
   private fun popFragment(): Boolean {
     return fragmentStack.isNotEmpty() && run {
       val stackItem = fragmentStack.removeAt(fragmentStack.size - 1)
-      val fragment = Class.forName(stackItem.className).newInstance() as Fragment
+      val fragment = supportFragmentManager.fragmentFactory.instantiate(classLoader, stackItem.className)
       stackItem.arguments?.let(fragment::setArguments)
       stackItem.savedState?.let(fragment::setInitialSavedState)
       replaceFragment(fragment, false)
@@ -150,15 +161,10 @@ abstract class ScreenActivity: FragmentActivity() {
       ?.hideSoftInputFromWindow((currentFocus ?: window.decorView).windowToken, 0)
   }
 
-  override fun onAttachFragment(fragment: Fragment) {
-    super.onAttachFragment(fragment)
-    hideKeyboard()
-  }
-
   internal fun onToolbarCreated(toolbar: Toolbar) {
     if (fragmentStack.isNotEmpty()) {
       toolbar.navigationIcon = toolbar.context.getDrawableFromAttr(android.R.attr.homeAsUpIndicator)
-      toolbar.setNavigationOnClickListener { onBackPressed() }
+      toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
     }
   }
 
@@ -235,10 +241,10 @@ abstract class ScreenActivity: FragmentActivity() {
     } else {
       Pair(Uri.fromFile(Cache.getReleaseFile(this, cacheFileName)), 0)
     }
-    // TODO Handle deprecation
-    @Suppress("DEPRECATION")
-    startActivity(Intent(Intent.ACTION_INSTALL_PACKAGE)
-      .setDataAndType(uri, "application/vnd.android.package-archive").setFlags(flags))
+
+    startActivity(Intent(Intent.ACTION_VIEW)
+      .setDataAndType(uri, "application/vnd.android.package-archive")
+      .addFlags(flags or Intent.FLAG_ACTIVITY_NEW_TASK))
   }
 
   internal fun navigateProduct(packageName: String) = pushFragment(ProductFragment(packageName))

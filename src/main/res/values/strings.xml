@@ -163,5 +163,6 @@
   <string name="versions">Versions</string>
   <string name="waiting_to_start_download">Waiting to start download</string>
   <string name="website">Website</string>
+  <string name="address_redirect_FORMAT">The repository address was redirected to %s. Do you want to use it instead?</string>
 
 </resources>

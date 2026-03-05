@@ -61,7 +61,7 @@ object Cache {
   fun getReleaseUri(context: Context, cacheFileName: String): Uri {
     val file = getReleaseFile(context, cacheFileName)
     val packageInfo = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PROVIDERS)
-    val authority = packageInfo.providers.find { it.name == Provider::class.java.name }!!.authority
+    val authority = packageInfo.providers?.find { it.name == Provider::class.java.name }!!.authority
     return Uri.Builder().scheme("content").authority(authority)
       .encodedPath(subPath(context.cacheDir, file)).build()
   }
@@ -106,8 +106,8 @@ object Cache {
         try {
           val stat = Os.lstat(it.path)
           stat.st_atime < olderThan
-        } catch (e: Exception) {
-          false
+        } catch (_: Exception) {
+            false
         }
       }
       if (older) {
@@ -138,7 +138,7 @@ object Cache {
     override fun onCreate(): Boolean = true
 
     override fun query(uri: Uri, projection: Array<String>?,
-      selection: String?, selectionArgs: Array<out String>?, sortOrder: String?): Cursor? {
+      selection: String?, selectionArgs: Array<out String>?, sortOrder: String?): Cursor {
       val file = getFileAndTypeForUri(uri).first
       val columns = (projection ?: defaultColumns).mapNotNull {
         when (it) {
@@ -150,12 +150,12 @@ object Cache {
       return MatrixCursor(columns.first.toTypedArray()).apply { addRow(columns.second.toTypedArray()) }
     }
 
-    override fun getType(uri: Uri): String? = getFileAndTypeForUri(uri).second
+    override fun getType(uri: Uri): String = getFileAndTypeForUri(uri).second
 
     private val unsupported: Nothing
       get() = throw UnsupportedOperationException()
 
-    override fun insert(uri: Uri, contentValues: ContentValues?): Uri? = unsupported
+    override fun insert(uri: Uri, contentValues: ContentValues?): Uri = unsupported
     override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int = unsupported
     override fun update(uri: Uri, contentValues: ContentValues?,
       selection: String?, selectionArgs: Array<out String>?): Int = unsupported

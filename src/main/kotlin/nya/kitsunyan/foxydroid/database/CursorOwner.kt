@@ -3,6 +3,8 @@ package nya.kitsunyan.foxydroid.database
 import android.database.Cursor
 import android.os.Bundle
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.loader.app.LoaderManager
 import androidx.loader.content.Loader
 import nya.kitsunyan.foxydroid.entity.ProductItem
@@ -39,13 +41,20 @@ class CursorOwner: Fragment(), LoaderManager.LoaderCallbacks<Cursor> {
     fun onCursorData(request: Request, cursor: Cursor?)
   }
 
-  private data class ActiveRequest(val request: Request, val callback: Callback?, val cursor: Cursor?)
+  data class ActiveRequest(val request: Request, val callback: Callback?, val cursor: Cursor?)
 
-  init {
-    retainInstance = true
+  class CursorViewModel : ViewModel() {
+    internal val activeRequests = mutableMapOf<Int, ActiveRequest>()
+
+    override fun onCleared() {
+      activeRequests.values.forEach { it.cursor?.close() }
+      activeRequests.clear()
+    }
   }
 
-  private val activeRequests = mutableMapOf<Int, ActiveRequest>()
+  private val viewModel by lazy { ViewModelProvider(this)[CursorViewModel::class.java] }
+  private val activeRequests: MutableMap<Int, ActiveRequest>
+    get() = viewModel.activeRequests
 
   fun attach(callback: Callback, request: Request) {
     val oldActiveRequest = activeRequests[request.id]
@@ -79,11 +88,32 @@ class CursorOwner: Fragment(), LoaderManager.LoaderCallbacks<Cursor> {
     return QueryLoader(requireContext()) {
       when (request) {
         is Request.ProductsAvailable -> Database.ProductAdapter
-          .query(false, false, request.searchQuery, request.section, request.order, it)
+          .query(
+              installed = false,
+              updates = false,
+              searchQuery = request.searchQuery,
+              section = request.section,
+              order = request.order,
+              signal = it
+          )
         is Request.ProductsInstalled -> Database.ProductAdapter
-          .query(true, false, request.searchQuery, request.section, request.order, it)
+          .query(
+              installed = true,
+              updates = false,
+              searchQuery = request.searchQuery,
+              section = request.section,
+              order = request.order,
+              signal = it
+          )
         is Request.ProductsUpdates -> Database.ProductAdapter
-          .query(true, true, request.searchQuery, request.section, request.order, it)
+          .query(
+              installed = true,
+              updates = true,
+              searchQuery = request.searchQuery,
+              section = request.section,
+              order = request.order,
+              signal = it
+          )
         is Request.Repositories -> Database.RepositoryAdapter.query(it)
       }
     }

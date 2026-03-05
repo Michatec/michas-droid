@@ -3,20 +3,13 @@ package nya.kitsunyan.foxydroid.entity
 import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.core.JsonParser
 import nya.kitsunyan.foxydroid.utility.extension.json.*
-import java.net.URL
 
-data class Repository(val id: Long, val address: String, val mirrors: List<String>,
-  val name: String, val description: String, val version: Int, val enabled: Boolean,
-  val fingerprint: String, val lastModified: String, val entityTag: String,
-  val updated: Long, val timestamp: Long, val authentication: String) {
-  fun edit(address: String, fingerprint: String, authentication: String): Repository {
-    val addressChanged = this.address != address
-    val fingerprintChanged = this.fingerprint != fingerprint
-    val changed = addressChanged || fingerprintChanged
-    return copy(address = address, fingerprint = fingerprint, lastModified = if (changed) "" else lastModified,
-      entityTag = if (changed) "" else entityTag, authentication = authentication)
-  }
-
+data class Repository(
+    val id: Long, val address: String, val mirrors: List<String>,
+    val name: String, val description: String, val version: Int, val enabled: Boolean,
+    val fingerprint: String, val lastModified: String, val entityTag: String,
+    val updated: Long, val timestamp: Long, val authentication: String
+) {
   fun update(mirrors: List<String>, name: String, description: String, version: Int,
     lastModified: String, entityTag: String, timestamp: Long): Repository {
     return copy(mirrors = mirrors, name = name, description = description,
@@ -79,25 +72,21 @@ data class Repository(val id: Long, val address: String, val mirrors: List<Strin
         lastModified, entityTag, updated, timestamp, authentication)
     }
 
-    fun newRepository(address: String, fingerprint: String, authentication: String): Repository {
-      val name = try {
-        URL(address).let { "${it.host}${it.path}" }
-      } catch (e: Exception) {
-        address
-      }
-      return defaultRepository(address, name, "", 0, true, fingerprint, authentication)
-    }
-
-    private fun defaultRepository(address: String, name: String, description: String,
+      private fun defaultRepository(address: String, name: String, description: String,
       version: Int, enabled: Boolean, fingerprint: String, authentication: String): Repository {
       return Repository(-1, address, emptyList(), name, description, version, enabled,
         fingerprint, "", "", 0L, 0L, authentication)
     }
 
     val defaultRepositories = listOf(run {
+            defaultRepository("https://repo.dgplayser.duckdns.org/fdroid/repo", "Michachatz F-Droid Repo", "Michachatz official repository. " +
+                    "Everything in this repository is always built from the source code.",
+                21, true, "3546DCBDD900F280EE2161CC163C1156BE2C2F3EB810415115039E0C7D3242C0", "")
+        },
+        run {
       defaultRepository("https://f-droid.org/repo", "F-Droid", "The official F-Droid Free Software repository. " +
         "Everything in this repository is always built from the source code.",
-        21, true, "43238D512C1E5EB2D6569F4A3AFBF5523418B82E0A3ED1552770ABB9A9C9CCAB", "")
+        21, false, "43238D512C1E5EB2D6569F4A3AFBF5523418B82E0A3ED1552770ABB9A9C9CCAB", "")
     }, run {
       defaultRepository("https://f-droid.org/archive", "F-Droid Archive", "The archive of the official F-Droid Free " +
         "Software repository. Apps here are old and can contain known vulnerabilities and security issues!",

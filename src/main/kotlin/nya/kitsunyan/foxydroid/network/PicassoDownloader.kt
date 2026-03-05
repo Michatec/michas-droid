@@ -65,7 +65,7 @@ object PicassoDownloader {
           } else {
             Downloader.createCall(request.newBuilder().url(address.toHttpUrl()
               .newBuilder().addPathSegment(packageName.orEmpty()).addPathSegment(locale.orEmpty())
-              .addPathSegment(device.orEmpty()).addPathSegment(screenshot.orEmpty()).build()),
+              .addPathSegment(device.orEmpty()).addPathSegment(screenshot).build()),
               authentication.orEmpty(), cache)
           }
         }

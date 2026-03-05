@@ -5,13 +5,16 @@ import android.content.Context
 import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.os.Bundle
-import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.ImageView
 import androidx.core.graphics.ColorUtils
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.FragmentManager
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.MarginPageTransformer
 import androidx.viewpager2.widget.ViewPager2
@@ -65,10 +68,11 @@ class ScreenshotsFragment(): DialogFragment() {
     val background = dialog.context.getColorFromAttr(android.R.attr.colorBackground).defaultColor
     decorView.setBackgroundColor(background.let { ColorUtils.blendARGB(0x00ffffff and it, it, 0.9f) })
     decorView.setPadding(0, 0, 0, 0)
-    background.let { ColorUtils.blendARGB(0x00ffffff and it, it, 0.8f) }.let {
-      window.statusBarColor = it
-      window.navigationBarColor = it
-    }
+    
+    WindowCompat.setDecorFitsSystemWindows(window, false)
+    val insetsController = WindowCompat.getInsetsController(window, decorView)
+    insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+
     window.attributes = window.attributes.apply {
       title = ScreenshotsFragment::class.java.name
       format = PixelFormat.TRANSLUCENT
@@ -86,17 +90,16 @@ class ScreenshotsFragment(): DialogFragment() {
       }
     }
 
-    val hideFlags = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-      View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE
-    decorView.systemUiVisibility = decorView.systemUiVisibility or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
-      View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-    val applyHide = Runnable { decorView.systemUiVisibility = decorView.systemUiVisibility or hideFlags }
+    val applyHide = Runnable { insetsController.hide(WindowInsetsCompat.Type.systemBars()) }
     val handleClick = {
       decorView.removeCallbacks(applyHide)
-      if ((decorView.systemUiVisibility and hideFlags) == hideFlags) {
-        decorView.systemUiVisibility = decorView.systemUiVisibility and hideFlags.inv()
+      val isVisible = decorView.rootWindowInsets?.let {
+        it.isVisible(WindowInsetsCompat.Type.statusBars()) || it.isVisible(WindowInsetsCompat.Type.navigationBars())
+      } ?: true
+      if (isVisible) {
+        insetsController.hide(WindowInsetsCompat.Type.systemBars())
       } else {
-        decorView.systemUiVisibility = decorView.systemUiVisibility or hideFlags
+        insetsController.show(WindowInsetsCompat.Type.systemBars())
       }
     }
     decorView.postDelayed(applyHide, 2000L)
@@ -112,21 +115,20 @@ class ScreenshotsFragment(): DialogFragment() {
       ViewGroup.LayoutParams.MATCH_PARENT))
     this.viewPager = viewPager
 
-    var restored = false
+    val restored = false
     productDisposable = Observable.just(Unit)
       .concatWith(Database.observable(Database.Subject.Products))
       .observeOn(Schedulers.io())
-      .flatMapSingle { RxUtils.querySingle { Database.ProductAdapter.get(packageName, it) } }
-      .map { Pair(it.find { it.repositoryId == repositoryId }, Database.RepositoryAdapter.get(repositoryId)) }
+      .flatMapSingle { RxUtils.querySingle { signal -> Database.ProductAdapter.get(packageName, signal) } }
+      .map { result -> Pair(result.find { it.repositoryId == repositoryId }, Database.RepositoryAdapter.get(repositoryId)) }
       .observeOn(AndroidSchedulers.mainThread())
-      .subscribe {
-        val (product, repository) = it
+      .subscribe { result ->
+          val (product, repository) = result
         val screenshots = product?.screenshots.orEmpty()
         (viewPager.adapter as Adapter).update(repository, screenshots)
         if (!restored) {
-          restored = true
-          val identifier = savedInstanceState?.getString(STATE_IDENTIFIER)
-            ?: requireArguments().getString(STATE_IDENTIFIER)
+            val identifier = savedInstanceState?.getString(STATE_IDENTIFIER)
+            ?: requireArguments().getString(EXTRA_IDENTIFIER)
           if (identifier != null) {
             val index = screenshots.indexOfFirst { it.identifier == identifier }
             if (index >= 0) {
@@ -160,9 +162,11 @@ class ScreenshotsFragment(): DialogFragment() {
 
   private class Adapter(private val packageName: String, private val onClick: () -> Unit):
     StableRecyclerAdapter<Adapter.ViewType, RecyclerView.ViewHolder>() {
-    enum class ViewType { SCREENSHOT }
+    enum class ViewType {
+      SECTION
+    }
 
-    private class ViewHolder(context: Context): RecyclerView.ViewHolder(ImageView(context)) {
+      private class ViewHolder(context: Context): RecyclerView.ViewHolder(ImageView(context)) {
       val image: ImageView
         get() = itemView as ImageView
 
@@ -182,17 +186,28 @@ class ScreenshotsFragment(): DialogFragment() {
     private var repository: Repository? = null
     private var screenshots = emptyList<Product.Screenshot>()
 
+    private class ScreenshotDiffCallback(private val oldList: List<Product.Screenshot>,
+      private val newList: List<Product.Screenshot>): DiffUtil.Callback() {
+      override fun getOldListSize(): Int = oldList.size
+      override fun getNewListSize(): Int = newList.size
+      override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+        oldList[oldItemPosition].identifier == newList[newItemPosition].identifier
+      override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+        oldList[oldItemPosition] == newList[newItemPosition]
+    }
+
     fun update(repository: Repository?, screenshots: List<Product.Screenshot>) {
       this.repository = repository
+      val diffResult = DiffUtil.calculateDiff(ScreenshotDiffCallback(this.screenshots, screenshots))
       this.screenshots = screenshots
-      notifyDataSetChanged()
+      diffResult.dispatchUpdatesTo(this)
     }
 
     var size = Pair(0, 0)
       set(value) {
         if (field != value) {
           field = value
-          notifyDataSetChanged()
+          notifyItemRangeChanged(0, itemCount)
         }
       }
 
@@ -206,7 +221,7 @@ class ScreenshotsFragment(): DialogFragment() {
 
     override fun getItemCount(): Int = screenshots.size
     override fun getItemDescriptor(position: Int): String = screenshots[position].identifier
-    override fun getItemEnumViewType(position: Int): ViewType = ViewType.SCREENSHOT
+    override fun getItemEnumViewType(position: Int): ViewType = ViewType.SECTION
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: ViewType): RecyclerView.ViewHolder {
       return ViewHolder(parent.context).apply {

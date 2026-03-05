@@ -1,57 +1,37 @@
 package nya.kitsunyan.foxydroid.database
 
-import android.database.ContentObservable
 import android.database.ContentObserver
 import android.database.Cursor
 import android.database.CursorWrapper
+import java.util.concurrent.CopyOnWriteArraySet
 
 class ObservableCursor(cursor: Cursor, private val observable: (register: Boolean,
   observer: () -> Unit) -> Unit): CursorWrapper(cursor) {
-  private var registered = false
-  private val contentObservable = ContentObservable()
+  private val observers = CopyOnWriteArraySet<ContentObserver>()
 
   private val onChange: () -> Unit = {
-    contentObservable.dispatchChange(false, null)
+    for (observer in observers) {
+      observer.dispatchChange(false, null)
+    }
   }
 
   init {
     observable(true, onChange)
-    registered = true
   }
 
   override fun registerContentObserver(observer: ContentObserver) {
     super.registerContentObserver(observer)
-    contentObservable.registerObserver(observer)
+    observers.add(observer)
   }
 
   override fun unregisterContentObserver(observer: ContentObserver) {
     super.unregisterContentObserver(observer)
-    contentObservable.unregisterObserver(observer)
-  }
-
-  @Suppress("DEPRECATION")
-  override fun requery(): Boolean {
-    if (!registered) {
-      observable(true, onChange)
-      registered = true
-    }
-    return super.requery()
-  }
-
-  @Suppress("DEPRECATION")
-  override fun deactivate() {
-    super.deactivate()
-    deactivateOrClose()
+    observers.remove(observer)
   }
 
   override fun close() {
     super.close()
-    contentObservable.unregisterAll()
-    deactivateOrClose()
-  }
-
-  private fun deactivateOrClose() {
+    observers.clear()
     observable(false, onChange)
-    registered = false
   }
 }

@@ -32,14 +32,15 @@ class QueryBuilder {
     this.arguments += arguments
   }
 
-  fun query(db: SQLiteDatabase, signal: CancellationSignal?): Cursor {
+  fun query(db: SQLiteDatabase, signal: CancellationSignal? = null): Cursor {
     val query = builder.toString()
     val arguments = arguments.toTypedArray()
     if (BuildConfig.DEBUG) {
       synchronized(QueryBuilder::class.java) {
         debug(query)
-        db.rawQuery("EXPLAIN QUERY PLAN $query", arguments).use { it.asSequence()
-          .forEach { debug(":: ${it.getString(it.getColumnIndex("detail"))}") } }
+        db.rawQuery("EXPLAIN QUERY PLAN $query", arguments).use { it ->
+            it.asSequence()
+          .forEach { debug(":: ${it.getString(it.getColumnIndexOrThrow("detail"))}") } }
       }
     }
     return db.rawQuery(query, arguments, signal)

@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.os.Bundle
+import android.os.Parcelable
 import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.MenuItem
@@ -14,6 +15,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.Toolbar
+import androidx.core.os.BundleCompat
 import androidx.fragment.app.DialogFragment
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -36,6 +38,7 @@ import nya.kitsunyan.foxydroid.utility.RxUtils
 import nya.kitsunyan.foxydroid.utility.Utils
 import nya.kitsunyan.foxydroid.utility.extension.android.*
 import nya.kitsunyan.foxydroid.widget.DividerItemDecoration
+import androidx.core.net.toUri
 
 class ProductFragment(): ScreenFragment(), ProductAdapter.Callbacks {
   companion object {
@@ -67,7 +70,7 @@ class ProductFragment(): ScreenFragment(), ProductAdapter.Callbacks {
   val packageName: String
     get() = requireArguments().getString(EXTRA_PACKAGE_NAME)!!
 
-  private var layoutManagerState: LinearLayoutManager.SavedState? = null
+  private var layoutManagerState: Parcelable? = null
 
   private var actions = Pair(emptySet<Action>(), null as Action?)
   private var products = emptyList<Pair<Product, Repository>>()
@@ -100,7 +103,7 @@ class ProductFragment(): ScreenFragment(), ProductAdapter.Callbacks {
     this.toolbar = toolbar
 
     toolbar.menu.apply {
-      for (action in Action.values()) {
+      for (action in Action.entries) {
         add(0, action.id, 0, action.adapterAction.titleResId)
           .setIcon(Utils.getToolbarIcon(toolbar.context, action.iconResId))
           .setVisible(false)
@@ -130,42 +133,43 @@ class ProductFragment(): ScreenFragment(), ProductAdapter.Callbacks {
       addOnScrollListener(scrollListener)
       addItemDecoration(adapter.gridItemDecoration)
       addItemDecoration(DividerItemDecoration(context, adapter::configureDivider))
-      savedInstanceState?.getParcelable<ProductAdapter.SavedState>(STATE_ADAPTER)?.let(adapter::restoreState)
-      layoutManagerState = savedInstanceState?.getParcelable(STATE_LAYOUT_MANAGER)
+      savedInstanceState?.let { bundle ->
+        BundleCompat.getParcelable(bundle, STATE_ADAPTER, ProductAdapter.SavedState::class.java)?.let(adapter::restoreState)
+        layoutManagerState = BundleCompat.getParcelable(bundle, STATE_LAYOUT_MANAGER, Parcelable::class.java)
+      }
       recyclerView = this
     }, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
 
-    var first = true
+    val first = true
     productDisposable = Observable.just(Unit)
       .concatWith(Database.observable(Database.Subject.Products))
       .observeOn(Schedulers.io())
-      .flatMapSingle { RxUtils.querySingle { Database.ProductAdapter.get(packageName, it) } }
+      .flatMapSingle { RxUtils.querySingle { signal -> Database.ProductAdapter.get(packageName, signal) } }
       .flatMapSingle { products -> RxUtils
-        .querySingle { Database.RepositoryAdapter.getAll(it) }
-        .map { it.asSequence().map { Pair(it.id, it) }.toMap()
-          .let { products.mapNotNull { product -> it[product.repositoryId]?.let { Pair(product, it) } } } } }
+        .querySingle { signal -> Database.RepositoryAdapter.getAll(signal) }
+        .map { result ->
+            result.asSequence().map { Pair(it.id, it) }.toMap()
+          .let { map -> products.mapNotNull { product -> map[product.repositoryId]?.let { Pair(product, it) } } } } }
       .flatMapSingle { products -> RxUtils
-        .querySingle { Nullable(Database.InstalledAdapter.get(packageName, it)) }
-        .map { Pair(products, it) } }
+        .querySingle { signal -> Nullable(Database.InstalledAdapter.get(packageName, signal)) }
+        .map { result -> Pair(products, result) } }
       .observeOn(AndroidSchedulers.mainThread())
-      .subscribe {
-        val (products, installedItem) = it
-        val firstChanged = first
-        first = false
-        val productChanged = this.products != products
+      .subscribe { result ->
+          val (products, installedItem) = result
+          val productChanged = this.products != products
         val installedItemChanged = this.installed?.installedItem != installedItem.value
-        if (firstChanged || productChanged || installedItemChanged) {
+        if (first || productChanged || installedItemChanged) {
           layoutManagerState?.let { recyclerView?.layoutManager!!.onRestoreInstanceState(it) }
           layoutManagerState = null
-          if (firstChanged || productChanged) {
+          if (first || productChanged) {
             this.products = products
           }
-          if (firstChanged || installedItemChanged) {
-            installed = installedItem.value?.let {
-              val isSystem = try {
+          if (first || installedItemChanged) {
+            installed = installedItem.value?.let { it ->
+                val isSystem = try {
                 ((requireContext().packageManager.getApplicationInfo(packageName, 0).flags)
                   and ApplicationInfo.FLAG_SYSTEM) != 0
-              } catch (e: Exception) {
+              } catch (_: Exception) {
                 false
               }
               val launcherActivities = if (packageName == requireContext().packageName) {
@@ -173,9 +177,9 @@ class ProductFragment(): ScreenFragment(), ProductAdapter.Callbacks {
                 emptyList()
               } else {
                 val packageManager = requireContext().packageManager
-                packageManager
+                val activities = packageManager
                   .queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
-                  .asSequence().mapNotNull { it.activityInfo }.filter { it.packageName == packageName }
+                activities.asSequence().mapNotNull { it.activityInfo }.filter { it.packageName == packageName }
                   .mapNotNull { activityInfo ->
                     val label = try {
                       activityInfo.loadLabel(packageManager).toString()
@@ -190,10 +194,9 @@ class ProductFragment(): ScreenFragment(), ProductAdapter.Callbacks {
               Installed(it, isSystem, launcherActivities)
             }
           }
-          val recyclerView = recyclerView!!
-          val adapter = recyclerView.adapter as ProductAdapter
-          if (firstChanged || productChanged || installedItemChanged) {
-            adapter.setProducts(recyclerView.context, packageName, products, installedItem.value)
+          recyclerView?.let {
+            val adapter = it.adapter as ProductAdapter
+            adapter.setProducts(it.context, packageName, products, installedItem.value)
           }
           updateButtons()
         }
@@ -289,7 +292,7 @@ class ProductFragment(): ScreenFragment(), ProductAdapter.Callbacks {
     }
     val toolbar = toolbar
     if (toolbar != null) {
-      for (action in Action.values()) {
+      for (action in Action.entries) {
         toolbar.menu.findItem(action.id).isVisible = action in displayActions
       }
     }
@@ -336,11 +339,9 @@ class ProductFragment(): ScreenFragment(), ProductAdapter.Callbacks {
         val compatibleReleases = productRepository?.first?.selectedReleases.orEmpty()
           .filter { installedItem == null || installedItem.signature == it.signature }
         val release = if (compatibleReleases.size >= 2) {
-          compatibleReleases
-            .filter { it.platforms.contains(Android.primaryPlatform) }
-            .minBy { it.platforms.size }
-            ?: compatibleReleases.minBy { it.platforms.size }
-            ?: compatibleReleases.firstOrNull()
+            compatibleReleases
+              .filter { it.platforms.contains(Android.primaryPlatform) }
+              .minBy { it.platforms.size }
         } else {
           compatibleReleases.firstOrNull()
         }
@@ -361,13 +362,11 @@ class ProductFragment(): ScreenFragment(), ProductAdapter.Callbacks {
       }
       ProductAdapter.Action.DETAILS -> {
         startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-          .setData(Uri.parse("package:$packageName")))
+          .setData("package:$packageName".toUri()))
       }
       ProductAdapter.Action.UNINSTALL -> {
-        // TODO Handle deprecation
-        @Suppress("DEPRECATION")
-        startActivity(Intent(Intent.ACTION_UNINSTALL_PACKAGE)
-          .setData(Uri.parse("package:$packageName")))
+        startActivity(Intent(Intent.ACTION_DELETE)
+          .setData("package:$packageName".toUri()))
       }
       ProductAdapter.Action.CANCEL -> {
         val binder = downloadConnection.binder
@@ -400,7 +399,7 @@ class ProductFragment(): ScreenFragment(), ProductAdapter.Callbacks {
 
   override fun onScreenshotClick(screenshot: Product.Screenshot) {
     val pair = products.asSequence()
-      .map { Pair(it.second, it.first.screenshots.find { it === screenshot }?.identifier) }
+      .map { it -> Pair(it.second, it.first.screenshots.find { it === screenshot }?.identifier) }
       .filter { it.second != null }.firstOrNull()
     if (pair != null) {
       val (repository, identifier) = pair
@@ -424,7 +423,7 @@ class ProductFragment(): ScreenFragment(), ProductAdapter.Callbacks {
         MessageDialog(MessageDialog.Message.ReleaseSignatureMismatch).show(childFragmentManager)
       }
       else -> {
-        val productRepository = products.asSequence().filter { it.first.releases.any { it === release } }.firstOrNull()
+        val productRepository = products.asSequence().filter { it -> it.first.releases.any { it === release } }.firstOrNull()
         if (productRepository != null) {
           downloadConnection.binder?.enqueue(packageName, productRepository.first.name,
             productRepository.second, release)

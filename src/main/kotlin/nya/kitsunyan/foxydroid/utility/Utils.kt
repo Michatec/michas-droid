@@ -1,6 +1,7 @@
 package nya.kitsunyan.foxydroid.utility
 
 import android.animation.ValueAnimator
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.Signature
 import android.content.res.Configuration
@@ -35,14 +36,14 @@ object Utils {
     return drawable
   }
 
-  fun calculateHash(signature: Signature): String? {
+  fun calculateHash(signature: Signature): String {
     return MessageDigest.getInstance("MD5").digest(signature.toCharsString().toByteArray()).hex()
   }
 
   fun calculateFingerprint(certificate: Certificate): String {
     val encoded = try {
       certificate.encoded
-    } catch (e: CertificateEncodingException) {
+    } catch (_: CertificateEncodingException) {
       null
     }
     return encoded?.let(::calculateFingerprint).orEmpty()
@@ -66,6 +67,7 @@ object Utils {
     }
   }
 
+  @SuppressLint("SuspiciousIndentation")
   fun configureLocale(context: Context): Context {
     val supportedLanguages = BuildConfig.LANGUAGES.toSet()
     val configuration = context.resources.configuration
@@ -78,15 +80,10 @@ object Utils {
     }
     val compatibleLocales = currentLocales
       .filter { it.language in supportedLanguages }
-      .let { if (it.isEmpty()) listOf(Locale.US) else it }
+      .let { it.ifEmpty { listOf(Locale.US) } }
     Locale.setDefault(compatibleLocales.first())
     val newConfiguration = Configuration(configuration)
-    if (Android.sdk(24)) {
       newConfiguration.setLocales(LocaleList(*compatibleLocales.toTypedArray()))
-    } else {
-      @Suppress("DEPRECATION")
-      newConfiguration.locale = compatibleLocales.first()
-    }
     return context.createConfigurationContext(newConfiguration)
   }
 

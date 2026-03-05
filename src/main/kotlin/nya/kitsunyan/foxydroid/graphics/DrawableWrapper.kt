@@ -1,9 +1,12 @@
 package nya.kitsunyan.foxydroid.graphics
 
+import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.ColorFilter
+import android.graphics.PorterDuff
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
+import androidx.core.graphics.drawable.DrawableCompat
 
 open class DrawableWrapper(val drawable: Drawable): Drawable() {
   init {
@@ -36,7 +39,7 @@ open class DrawableWrapper(val drawable: Drawable): Drawable() {
   }
 
   override fun getAlpha(): Int {
-    return drawable.alpha
+    return DrawableCompat.getAlpha(drawable)
   }
 
   override fun setAlpha(alpha: Int) {
@@ -44,13 +47,32 @@ open class DrawableWrapper(val drawable: Drawable): Drawable() {
   }
 
   override fun getColorFilter(): ColorFilter? {
-    return drawable.colorFilter
+    return DrawableCompat.getColorFilter(drawable)
   }
 
   override fun setColorFilter(colorFilter: ColorFilter?) {
     drawable.colorFilter = colorFilter
   }
 
-  @Suppress("DEPRECATION")
+  override fun setTint(tintColor: Int) {
+    DrawableCompat.setTint(drawable, tintColor)
+  }
+
+  override fun setTintList(tint: ColorStateList?) {
+    DrawableCompat.setTintList(drawable, tint)
+  }
+
+  override fun setTintMode(tintMode: PorterDuff.Mode?) {
+    DrawableCompat.setTintMode(drawable, tintMode ?: PorterDuff.Mode.SRC_IN)
+  }
+
+  override fun setHotspot(x: Float, y: Float) {
+    DrawableCompat.setHotspot(drawable, x, y)
+  }
+
+  override fun setHotspotBounds(left: Int, top: Int, right: Int, bottom: Int) {
+    DrawableCompat.setHotspotBounds(drawable, left, top, right, bottom)
+  }
+
   override fun getOpacity(): Int = drawable.opacity
 }

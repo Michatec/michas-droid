@@ -37,8 +37,8 @@ object IndexV1Parser {
     if (jsonParser.nextToken() != JsonToken.START_OBJECT) {
       jsonParser.illegal()
     } else {
-      jsonParser.forEachKey {
-        when {
+      jsonParser.forEachKey { it ->
+          when {
           it.dictionary("repo") -> {
             var address = ""
             var mirrors = emptyList<String>()
@@ -100,8 +100,8 @@ object IndexV1Parser {
     val licenses = mutableListOf<String>()
     val donates = mutableListOf<Product.Donate>()
     val localizedMap = mutableMapOf<String, Localized>()
-    forEachKey {
-      when {
+    forEachKey { it ->
+        when {
         it.string("packageName") -> packageName = valueAsString
         it.string("name") -> nameFallback = valueAsString
         it.string("summary") -> summaryFallback = valueAsString
@@ -125,8 +125,8 @@ object IndexV1Parser {
         it.string("flattrID") -> donates += Product.Donate.Flattr(valueAsString)
         it.string("liberapayID") -> donates += Product.Donate.Liberapay(valueAsString)
         it.string("openCollective") -> donates += Product.Donate.OpenCollective(valueAsString)
-        it.dictionary("localized") -> forEachKey {
-          if (it.token == JsonToken.START_OBJECT) {
+        it.dictionary("localized") -> forEachKey { it ->
+            if (it.token == JsonToken.START_OBJECT) {
             val locale = it.key
             var name = ""
             var summary = ""

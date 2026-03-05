@@ -12,6 +12,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageInfo
 import com.squareup.picasso.OkHttp3Downloader
 import com.squareup.picasso.Picasso
+import io.reactivex.rxjava3.disposables.Disposable
 import nya.kitsunyan.foxydroid.content.Cache
 import nya.kitsunyan.foxydroid.content.Preferences
 import nya.kitsunyan.foxydroid.content.ProductPreferences
@@ -27,7 +28,6 @@ import nya.kitsunyan.foxydroid.utility.extension.android.*
 import java.net.InetSocketAddress
 import java.net.Proxy
 
-@Suppress("unused")
 class MainApplication: Application() {
   private fun PackageInfo.toInstalledItem(): InstalledItem {
     val signatureString = singleSignature?.let(Utils::calculateHash).orEmpty()
@@ -38,13 +38,15 @@ class MainApplication: Application() {
     super.attachBaseContext(Utils.configureLocale(base))
   }
 
+  private var preferencesDisposable: Disposable? = null
+
   override fun onCreate() {
     super.onCreate()
 
     val databaseUpdated = Database.init(this)
     Preferences.init(this)
     ProductPreferences.init(this)
-    RepositoryUpdater.init(this)
+    RepositoryUpdater.init()
     listenApplications()
     listenPreferences()
 
@@ -69,7 +71,7 @@ class MainApplication: Application() {
             Intent.ACTION_PACKAGE_REMOVED -> {
               val packageInfo = try {
                 packageManager.getPackageInfo(packageName, Android.PackageManager.signaturesFlag)
-              } catch (e: Exception) {
+              } catch (_: Exception) {
                 null
               }
               if (packageInfo != null) {
@@ -93,22 +95,21 @@ class MainApplication: Application() {
 
   private fun listenPreferences() {
     updateProxy()
-    var lastAutoSync = Preferences[Preferences.Key.AutoSync]
-    var lastUpdateUnstable = Preferences[Preferences.Key.UpdateUnstable]
-    Preferences.observable.subscribe {
+    val lastAutoSync = Preferences[Preferences.Key.AutoSync]
+    val lastUpdateUnstable = Preferences[Preferences.Key.UpdateUnstable]
+    preferencesDisposable?.dispose()
+    preferencesDisposable = Preferences.observable.subscribe {
       if (it == Preferences.Key.ProxyType || it == Preferences.Key.ProxyHost || it == Preferences.Key.ProxyPort) {
         updateProxy()
       } else if (it == Preferences.Key.AutoSync) {
         val autoSync = Preferences[Preferences.Key.AutoSync]
         if (lastAutoSync != autoSync) {
-          lastAutoSync = autoSync
-          updateSyncJob(true)
+            updateSyncJob(true)
         }
       } else if (it == Preferences.Key.UpdateUnstable) {
         val updateUnstable = Preferences[Preferences.Key.UpdateUnstable]
         if (lastUpdateUnstable != updateUnstable) {
-          lastUpdateUnstable = updateUnstable
-          forceSyncAll()
+            forceSyncAll()
         }
       }
     }

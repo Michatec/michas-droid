@@ -38,6 +38,7 @@ import android.widget.Toast
 import androidx.core.graphics.ColorUtils
 import androidx.core.text.HtmlCompat
 import androidx.core.text.util.LinkifyCompat
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import nya.kitsunyan.foxydroid.R
 import nya.kitsunyan.foxydroid.content.Preferences
@@ -61,6 +62,7 @@ import nya.kitsunyan.foxydroid.widget.StableRecyclerAdapter
 import java.lang.ref.WeakReference
 import java.util.Locale
 import kotlin.math.*
+import androidx.core.net.toUri
 
 class ProductAdapter(private val callbacks: Callbacks, private val columns: Int):
   StableRecyclerAdapter<ProductAdapter.ViewType, RecyclerView.ViewHolder>() {
@@ -130,7 +132,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
     abstract val descriptor: String
     abstract val viewType: ViewType
 
-    class HeaderItem(val repository: Repository, val product: Product): Item() {
+    data class HeaderItem(val repository: Repository, val product: Product): Item() {
       override val descriptor: String
         get() = "header"
 
@@ -138,7 +140,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
         get() = ViewType.HEADER
     }
 
-    class SwitchItem(val switchType: SwitchType, val packageName: String, val versionCode: Long): Item() {
+    data class SwitchItem(val switchType: SwitchType, val packageName: String, val versionCode: Long): Item() {
       override val descriptor: String
         get() = "switch.${switchType.name}"
 
@@ -146,7 +148,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
         get() = ViewType.SWITCH
     }
 
-    class SectionItem(val sectionType: SectionType, val expandType: ExpandType,
+    data class SectionItem(val sectionType: SectionType, val expandType: ExpandType,
       val items: List<Item>, val collapseCount: Int): Item() {
       constructor(sectionType: SectionType): this(sectionType, ExpandType.NOTHING, emptyList(), 0)
 
@@ -157,7 +159,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
         get() = ViewType.SECTION
     }
 
-    class ExpandItem(val expandType: ExpandType, val replace: Boolean, val items: List<Item>): Item() {
+    data class ExpandItem(val expandType: ExpandType, val replace: Boolean, val items: List<Item>): Item() {
       override val descriptor: String
         get() = "expand.${expandType.name}"
 
@@ -165,7 +167,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
         get() = ViewType.EXPAND
     }
 
-    class TextItem(val textType: TextType, val text: CharSequence): Item() {
+    data class TextItem(val textType: TextType, val text: CharSequence): Item() {
       override val descriptor: String
         get() = "text.${textType.name}"
 
@@ -185,7 +187,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
         get() = uri?.schemeSpecificPart?.nullIfEmpty()
           ?.let { if (it.startsWith("//")) null else it } ?: uri?.toString()
 
-      class Typed(val linkType: LinkType, val text: String, override val uri: Uri?): LinkItem() {
+      data class Typed(val linkType: LinkType, val text: String, override val uri: Uri?): LinkItem() {
         override val descriptor: String
           get() = "link.typed.${linkType.name}"
 
@@ -198,7 +200,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
         }
       }
 
-      class Donate(val donate: Product.Donate): LinkItem() {
+      data class Donate(val donate: Product.Donate): LinkItem() {
         override val descriptor: String
           get() = "link.donate.$donate"
 
@@ -222,17 +224,17 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
         }
 
         override val uri: Uri? = when (donate) {
-          is Product.Donate.Regular -> Uri.parse(donate.url)
-          is Product.Donate.Bitcoin -> Uri.parse("bitcoin:${donate.address}")
-          is Product.Donate.Litecoin -> Uri.parse("litecoin:${donate.address}")
-          is Product.Donate.Flattr -> Uri.parse("https://flattr.com/thing/${donate.id}")
-          is Product.Donate.Liberapay -> Uri.parse("https://liberapay.com/~${donate.id}")
-          is Product.Donate.OpenCollective -> Uri.parse("https://opencollective.com/${donate.id}")
+          is Product.Donate.Regular -> donate.url.toUri()
+          is Product.Donate.Bitcoin -> "bitcoin:${donate.address}".toUri()
+          is Product.Donate.Litecoin -> "litecoin:${donate.address}".toUri()
+          is Product.Donate.Flattr -> "https://flattr.com/thing/${donate.id}".toUri()
+          is Product.Donate.Liberapay -> "https://liberapay.com/~${donate.id}".toUri()
+          is Product.Donate.OpenCollective -> "https://opencollective.com/${donate.id}".toUri()
         }
       }
     }
 
-    class PermissionsItem(val group: PermissionGroupInfo?, val permissions: List<PermissionInfo>): Item() {
+    data class PermissionsItem(val group: PermissionGroupInfo?, val permissions: List<PermissionInfo>): Item() {
       override val descriptor: String
         get() = "permissions.${group?.name}.${permissions.joinToString(separator = ".") { it.name }}"
 
@@ -240,7 +242,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
         get() = ViewType.PERMISSIONS
     }
 
-    class ScreenshotItem(val repository: Repository, val packageName: String,
+    data class ScreenshotItem(val repository: Repository, val packageName: String,
       val screenshot: Product.Screenshot): Item() {
       override val descriptor: String
         get() = "screenshot.${repository.id}.${screenshot.identifier}"
@@ -249,7 +251,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
         get() = ViewType.SCREENSHOT
     }
 
-    class ReleaseItem(val repository: Repository, val release: Release, val selectedRepository: Boolean,
+    data class ReleaseItem(val repository: Repository, val release: Release, val selectedRepository: Boolean,
       val showSignature: Boolean): Item() {
       override val descriptor: String
         get() = "release.${repository.id}.${release.identifier}"
@@ -258,7 +260,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
         get() = ViewType.RELEASE
     }
 
-    class EmptyItem(val packageName: String): Item() {
+    data class EmptyItem(val packageName: String): Item() {
       override val descriptor: String
         get() = "empty"
 
@@ -269,7 +271,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
 
   private class Measurement<T: Any> {
     private var density = 0f
-    private var scaledDensity = 0f
+    private var fontScale = 0f
     private lateinit var metric: T
 
     fun measure(view: View) {
@@ -277,10 +279,10 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
     }
 
     fun invalidate(resources: Resources, callback: () -> T): T {
-      val (density, scaledDensity) = resources.displayMetrics.let { Pair(it.density, it.scaledDensity) }
-      if (this.density != density || this.scaledDensity != scaledDensity) {
+      val (density, fontScale) = resources.displayMetrics.density to resources.configuration.fontScale
+      if (this.density != density || this.fontScale != fontScale) {
         this.density = density
-        this.scaledDensity = scaledDensity
+        this.fontScale = fontScale
         metric = callback()
       }
       return metric
@@ -334,12 +336,12 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
 
     init {
       itemView as TextView
-      itemView.typeface = TypefaceExtra.medium
-      itemView.setTextSizeScaled(14)
-      itemView.setTextColor(itemView.context.getColorFromAttr(android.R.attr.colorAccent))
+      (itemView as TextView).typeface = TypefaceExtra.medium
+      (itemView as TextView).setTextSizeScaled(14)
+      (itemView as TextView).setTextColor(itemView.context.getColorFromAttr(android.R.attr.colorAccent))
       itemView.background = itemView.context.getDrawableFromAttr(android.R.attr.selectableItemBackground)
-      itemView.gravity = Gravity.CENTER
-      itemView.isAllCaps = true
+      (itemView as TextView).gravity = Gravity.CENTER
+      (itemView as TextView).isAllCaps = true
       itemView.layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT,
         itemView.resources.sizeScaled(48)).apply { topMargin = -itemView.resources.sizeScaled(16) }
     }
@@ -351,10 +353,10 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
 
     init {
       itemView as TextView
-      itemView.setTextSizeScaled(14)
-      itemView.setTextColor(itemView.context.getColorFromAttr(android.R.attr.textColorPrimary))
+      (itemView as TextView).setTextSizeScaled(14)
+      (itemView as TextView).setTextColor(itemView.context.getColorFromAttr(android.R.attr.textColorPrimary))
       itemView.resources.sizeScaled(16).let { itemView.setPadding(it, it, it, it) }
-      itemView.movementMethod = ClickableMovementMethod
+      (itemView as TextView).movementMethod = ClickableMovementMethod
       itemView.layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT,
         RecyclerView.LayoutParams.WRAP_CONTENT)
     }
@@ -363,11 +365,10 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
   private open class OverlappingViewHolder(itemView: View): RecyclerView.ViewHolder(itemView) {
     init {
       // Block touch events if touched above negative margin
-      itemView.setOnTouchListener { _, event ->
-        event.action == MotionEvent.ACTION_DOWN && run {
-          val top = (itemView.layoutParams as ViewGroup.MarginLayoutParams).topMargin
-          top < 0 && event.y < -top
-        }
+      @SuppressLint("ClickableViewAccessibility")
+      itemView.setOnTouchListener { v, event ->
+        val top = (v.layoutParams as ViewGroup.MarginLayoutParams).topMargin
+          event.action == MotionEvent.ACTION_DOWN && top < 0 && event.y < -top
       }
     }
   }
@@ -441,7 +442,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
       }
       image.scaleType = ImageView.ScaleType.CENTER_CROP
       image.setBackgroundColor(ColorUtils.blendARGB(backgroundColor, accentColor, 0.1f))
-      itemView.addView(image, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT)
+      (itemView as ViewGroup).addView(image, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT)
       itemView.layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT,
         RecyclerView.LayoutParams.WRAP_CONTENT)
 
@@ -482,8 +483,8 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
 
     init {
       itemView as LinearLayout
-      itemView.orientation = LinearLayout.VERTICAL
-      itemView.gravity = Gravity.CENTER
+      (itemView as LinearLayout).orientation = LinearLayout.VERTICAL
+      (itemView as LinearLayout).gravity = Gravity.CENTER
       itemView.resources.sizeScaled(20).let { itemView.setPadding(it, it, it, it) }
       val title = TextView(itemView.context)
       title.gravity = Gravity.CENTER
@@ -491,12 +492,12 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
       title.setTextColor(context.getColorFromAttr(android.R.attr.textColorPrimary))
       title.setTextSizeScaled(20)
       title.setText(R.string.application_not_found)
-      itemView.addView(title, LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+      (itemView as ViewGroup).addView(title, LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
       val packageName = TextView(itemView.context)
       packageName.gravity = Gravity.CENTER
       packageName.setTextColor(context.getColorFromAttr(android.R.attr.textColorPrimary))
       packageName.setTextSizeScaled(16)
-      itemView.addView(packageName, LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+      (itemView as ViewGroup).addView(packageName, LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
       itemView.layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT,
         RecyclerView.LayoutParams.MATCH_PARENT)
       this.packageName = packageName
@@ -529,7 +530,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
     override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) {
       val holder = parent.getChildViewHolder(view)
       if (holder is ScreenshotViewHolder) {
-        val position = holder.adapterPosition
+        val position = holder.bindingAdapterPosition
         if (position >= 0) {
           val first = items.subList(0, position).indexOfLast { it !is Item.ScreenshotItem } + 1
           val gridCount = items.subList(first, items.size).indexOfFirst { it !is Item.ScreenshotItem }
@@ -555,21 +556,31 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
     when {
       nextItem == null || currentItem is Item.HeaderItem ||
         nextItem is Item.TextItem && nextItem.textType == TextType.DESCRIPTION -> {
-        configuration.set(true, false, 0, 0)
+        configuration.set(needDivider = true, toTop = false, paddingStart = 0, paddingEnd = 0)
       }
       nextItem is Item.SectionItem -> {
-        configuration.set(true, true, 0, 0)
+        configuration.set(needDivider = true, toTop = true, paddingStart = 0, paddingEnd = 0)
       }
       currentItem is Item.LinkItem && nextItem is Item.LinkItem ||
         currentItem is Item.PermissionsItem && nextItem is Item.PermissionsItem -> {
-        configuration.set(true, false, context.resources.sizeScaled(72), 0)
+        configuration.set(
+            needDivider = true,
+            toTop = false,
+            paddingStart = context.resources.sizeScaled(72),
+            paddingEnd = 0
+        )
       }
       currentItem is Item.SwitchItem && nextItem is Item.SwitchItem ||
         currentItem is Item.ReleaseItem && nextItem is Item.ReleaseItem -> {
-        configuration.set(true, false, context.resources.sizeScaled(16), 0)
+        configuration.set(
+            needDivider = true,
+            toTop = false,
+            paddingStart = context.resources.sizeScaled(16),
+            paddingEnd = 0
+        )
       }
       else -> {
-        configuration.set(false, false, 0, 0)
+        configuration.set(needDivider = false, toTop = false, paddingStart = 0, paddingEnd = 0)
       }
     }
   }
@@ -579,24 +590,37 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
   private var product: Product? = null
   private var installedItem: InstalledItem? = null
 
+  private class ItemDiffCallback(private val oldList: List<Item>, private val newList: List<Item>): DiffUtil.Callback() {
+    override fun getOldListSize(): Int = oldList.size
+    override fun getNewListSize(): Int = newList.size
+
+    override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+      return oldList[oldItemPosition].descriptor == newList[newItemPosition].descriptor
+    }
+
+    override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+      return oldList[oldItemPosition] == newList[newItemPosition]
+    }
+  }
+
   fun setProducts(context: Context, packageName: String,
     products: List<Pair<Product, Repository>>, installedItem: InstalledItem?) {
     val productRepository = Product.findSuggested(products, installedItem) { it.first }
-    items.clear()
+    val newItems = mutableListOf<Item>()
 
     if (productRepository != null) {
-      items += Item.HeaderItem(productRepository.second, productRepository.first)
+      newItems += Item.HeaderItem(productRepository.second, productRepository.first)
 
       if (installedItem != null) {
-        items.add(Item.SwitchItem(SwitchType.IGNORE_ALL_UPDATES, packageName, productRepository.first.versionCode))
+        newItems.add(Item.SwitchItem(SwitchType.IGNORE_ALL_UPDATES, packageName, productRepository.first.versionCode))
         if (productRepository.first.canUpdate(installedItem)) {
-          items.add(Item.SwitchItem(SwitchType.IGNORE_THIS_UPDATE, packageName, productRepository.first.versionCode))
+          newItems.add(Item.SwitchItem(SwitchType.IGNORE_THIS_UPDATE, packageName, productRepository.first.versionCode))
         }
       }
 
       val textViewHolder = TextViewHolder(context)
-      val textViewWidthSpec = context.resources.displayMetrics.widthPixels
-        .let { View.MeasureSpec.makeMeasureSpec(it, View.MeasureSpec.EXACTLY) }
+      val textViewWidthSpec = View.MeasureSpec.makeMeasureSpec(
+        context.resources.displayMetrics.widthPixels, View.MeasureSpec.EXACTLY)
       val textViewHeightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
 
       fun CharSequence.lineCropped(maxLines: Int, cropLines: Int): CharSequence? {
@@ -638,10 +662,10 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
         val cropped = if (ExpandType.DESCRIPTION !in expanded) description.lineCropped(12, 10) else null
         val item = Item.TextItem(TextType.DESCRIPTION, description)
         if (cropped != null) {
-          items += listOf(Item.TextItem(TextType.DESCRIPTION, cropped),
+          newItems += listOf(Item.TextItem(TextType.DESCRIPTION, cropped),
             Item.ExpandItem(ExpandType.DESCRIPTION, true, listOf(item)))
         } else {
-          items += item
+          newItems += item
         }
       }
 
@@ -662,20 +686,20 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
         }
       }.joinToString(separator = "\n") { "\u2022 $it" }
       if (antiFeatures.isNotEmpty()) {
-        items += Item.SectionItem(SectionType.ANTI_FEATURES)
-        items += Item.TextItem(TextType.ANTI_FEATURES, antiFeatures)
+        newItems += Item.SectionItem(SectionType.ANTI_FEATURES)
+        newItems += Item.TextItem(TextType.ANTI_FEATURES, antiFeatures)
       }
 
       val changes = formatHtml(productRepository.first.whatsNew)
       if (changes.isNotEmpty()) {
-        items += Item.SectionItem(SectionType.CHANGES)
+        newItems += Item.SectionItem(SectionType.CHANGES)
         val cropped = if (ExpandType.CHANGES !in expanded) changes.lineCropped(12, 10) else null
         val item = Item.TextItem(TextType.CHANGES, changes)
         if (cropped != null) {
-          items += listOf(Item.TextItem(TextType.CHANGES, cropped),
+          newItems += listOf(Item.TextItem(TextType.CHANGES, cropped),
             Item.ExpandItem(ExpandType.CHANGES, true, listOf(item)))
         } else {
-          items += item
+          newItems += item
         }
       }
 
@@ -685,30 +709,32 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
           linkItems += Item.LinkItem.Typed(LinkType.AUTHOR, author.name, author.web.nullIfEmpty()?.let(Uri::parse))
         }
         author.email.nullIfEmpty()?.let { linkItems += Item.LinkItem
-          .Typed(LinkType.EMAIL, "", Uri.parse("mailto:$it")) }
+          .Typed(LinkType.EMAIL, "", "mailto:$it".toUri()) }
         linkItems += licenses.asSequence().map { Item.LinkItem.Typed(LinkType.LICENSE, it,
-          Uri.parse("https://spdx.org/licenses/$it.html")) }
-        source.nullIfEmpty()?.let { linkItems += Item.LinkItem.Typed(LinkType.SOURCE, "", Uri.parse(it)) }
-        tracker.nullIfEmpty()?.let { linkItems += Item.LinkItem.Typed(LinkType.TRACKER, "", Uri.parse(it)) }
-        changelog.nullIfEmpty()?.let { linkItems += Item.LinkItem.Typed(LinkType.CHANGELOG, "", Uri.parse(it)) }
-        web.nullIfEmpty()?.let { linkItems += Item.LinkItem.Typed(LinkType.WEB, "", Uri.parse(it)) }
+            "https://spdx.org/licenses/$it.html".toUri()) }
+        source.nullIfEmpty()?.let { linkItems += Item.LinkItem.Typed(LinkType.SOURCE, "", it.toUri()) }
+        tracker.nullIfEmpty()?.let { linkItems += Item.LinkItem.Typed(LinkType.TRACKER, "",
+            it.toUri()) }
+        changelog.nullIfEmpty()?.let { linkItems += Item.LinkItem.Typed(LinkType.CHANGELOG, "",
+            it.toUri()) }
+        web.nullIfEmpty()?.let { linkItems += Item.LinkItem.Typed(LinkType.WEB, "", it.toUri()) }
       }
       if (linkItems.isNotEmpty()) {
         if (ExpandType.LINKS in expanded) {
-          items += Item.SectionItem(SectionType.LINKS, ExpandType.LINKS, emptyList(), linkItems.size)
-          items += linkItems
+          newItems += Item.SectionItem(SectionType.LINKS, ExpandType.LINKS, emptyList(), linkItems.size)
+          newItems += linkItems
         } else {
-          items += Item.SectionItem(SectionType.LINKS, ExpandType.LINKS, linkItems, 0)
+          newItems += Item.SectionItem(SectionType.LINKS, ExpandType.LINKS, linkItems, 0)
         }
       }
 
       val donateItems = productRepository.first.donates.map(Item.LinkItem::Donate)
       if (donateItems.isNotEmpty()) {
         if (ExpandType.DONATES in expanded) {
-          items += Item.SectionItem(SectionType.DONATE, ExpandType.DONATES, emptyList(), donateItems.size)
-          items += donateItems
+          newItems += Item.SectionItem(SectionType.DONATE, ExpandType.DONATES, emptyList(), donateItems.size)
+          newItems += donateItems
         } else {
-          items += Item.SectionItem(SectionType.DONATE, ExpandType.DONATES, donateItems, 0)
+          newItems += Item.SectionItem(SectionType.DONATE, ExpandType.DONATES, donateItems, 0)
         }
       }
 
@@ -719,7 +745,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
           .asSequence().mapNotNull {
             try {
               packageManager.getPermissionInfo(it, 0)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
               null
             }
           }
@@ -727,7 +753,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
           .asSequence().map { (group, permissionInfo) ->
             val permissionGroupInfo = try {
               group?.let { packageManager.getPermissionGroupInfo(it, 0) }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
               null
             }
             Pair(permissionGroupInfo, permissionInfo)
@@ -740,11 +766,11 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
           permissions.asSequence().find { it.key == null }
             ?.let { permissionsItems += Item.PermissionsItem(null, it.value.flatten()) }
           if (ExpandType.PERMISSIONS in expanded) {
-            items += Item.SectionItem(SectionType.PERMISSIONS, ExpandType.PERMISSIONS,
+            newItems += Item.SectionItem(SectionType.PERMISSIONS, ExpandType.PERMISSIONS,
               emptyList(), permissionsItems.size)
-            items += permissionsItems
+            newItems += permissionsItems
           } else {
-            items += Item.SectionItem(SectionType.PERMISSIONS, ExpandType.PERMISSIONS, permissionsItems, 0)
+            newItems += Item.SectionItem(SectionType.PERMISSIONS, ExpandType.PERMISSIONS, permissionsItems, 0)
           }
         }
       }
@@ -753,10 +779,10 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
         .map { Item.ScreenshotItem(productRepository.second, packageName, it) }
       if (screenshotItems.isNotEmpty()) {
         if (ExpandType.SCREENSHOTS in expanded) {
-          items += Item.SectionItem(SectionType.SCREENSHOTS, ExpandType.SCREENSHOTS, emptyList(), screenshotItems.size)
-          items += screenshotItems
+          newItems += Item.SectionItem(SectionType.SCREENSHOTS, ExpandType.SCREENSHOTS, emptyList(), screenshotItems.size)
+          newItems += screenshotItems
         } else {
-          items += Item.SectionItem(SectionType.SCREENSHOTS, ExpandType.SCREENSHOTS, screenshotItems, 0)
+          newItems += Item.SectionItem(SectionType.SCREENSHOTS, ExpandType.SCREENSHOTS, screenshotItems, 0)
         }
       }
     }
@@ -778,22 +804,26 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
       .sortedByDescending { it.release.versionCode }
       .toList()
     if (releaseItems.isNotEmpty()) {
-      items += Item.SectionItem(SectionType.VERSIONS)
+      newItems += Item.SectionItem(SectionType.VERSIONS)
       val maxReleases = 5
       if (releaseItems.size > maxReleases && ExpandType.VERSIONS !in expanded) {
-        items += releaseItems.take(maxReleases)
-        items += Item.ExpandItem(ExpandType.VERSIONS, false, releaseItems.takeLast(releaseItems.size - maxReleases))
+        newItems += releaseItems.take(maxReleases)
+        newItems += Item.ExpandItem(ExpandType.VERSIONS, false, releaseItems.takeLast(releaseItems.size - maxReleases))
       } else {
-        items += releaseItems
+        newItems += releaseItems
       }
     }
 
-    if (items.isEmpty()) {
-      items += Item.EmptyItem(packageName)
+    if (newItems.isEmpty()) {
+      newItems += Item.EmptyItem(packageName)
     }
+    
+    val diffResult = DiffUtil.calculateDiff(ItemDiffCallback(items, newItems))
+    items.clear()
+    items.addAll(newItems)
     this.product = productRepository?.first
     this.installedItem = installedItem
-    notifyDataSetChanged()
+    diffResult.dispatchUpdatesTo(this)
   }
 
   private var action: Action? = null
@@ -850,7 +880,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
       }
       ViewType.SWITCH -> SwitchViewHolder(parent.inflate(R.layout.switch_item)).apply {
         itemView.setOnClickListener {
-          val switchItem = items[adapterPosition] as Item.SwitchItem
+          val switchItem = items[bindingAdapterPosition] as Item.SwitchItem
           val productPreference = when (switchItem.switchType) {
             SwitchType.IGNORE_ALL_UPDATES -> {
               ProductPreferences[switchItem.packageName].let { it.copy(ignoreUpdates = !it.ignoreUpdates) }
@@ -868,20 +898,20 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
       }
       ViewType.SECTION -> SectionViewHolder(parent.inflate(R.layout.section_item)).apply {
         itemView.setOnClickListener {
-          val position = adapterPosition
+          val position = bindingAdapterPosition
           val sectionItem = items[position] as Item.SectionItem
           if (sectionItem.items.isNotEmpty()) {
             expanded += sectionItem.expandType
             items[position] = Item.SectionItem(sectionItem.sectionType, sectionItem.expandType, emptyList(),
               sectionItem.items.size + sectionItem.collapseCount)
-            notifyItemChanged(adapterPosition, Payload.REFRESH)
+            notifyItemChanged(bindingAdapterPosition, Payload.REFRESH)
             items.addAll(position + 1, sectionItem.items)
             notifyItemRangeInserted(position + 1, sectionItem.items.size)
           } else if (sectionItem.collapseCount > 0) {
             expanded -= sectionItem.expandType
             items[position] = Item.SectionItem(sectionItem.sectionType, sectionItem.expandType,
               items.subList(position + 1, position + 1 + sectionItem.collapseCount).toList(), 0)
-            notifyItemChanged(adapterPosition, Payload.REFRESH)
+            notifyItemChanged(bindingAdapterPosition, Payload.REFRESH)
             repeat(sectionItem.collapseCount) { items.removeAt(position + 1) }
             notifyItemRangeRemoved(position + 1, sectionItem.collapseCount)
           }
@@ -889,7 +919,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
       }
       ViewType.EXPAND -> ExpandViewHolder(parent.context).apply {
         itemView.setOnClickListener {
-          val position = adapterPosition
+          val position = bindingAdapterPosition
           val expandItem = items[position] as Item.ExpandItem
           items.removeAt(position)
           expanded += expandItem.expandType
@@ -913,32 +943,32 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
       ViewType.TEXT -> TextViewHolder(parent.context)
       ViewType.LINK -> LinkViewHolder(parent.inflate(R.layout.link_item)).apply {
         itemView.setOnClickListener {
-          val linkItem = items[adapterPosition] as Item.LinkItem
+          val linkItem = items[bindingAdapterPosition] as Item.LinkItem
           if (linkItem.uri?.let { callbacks.onUriClick(it, false) } != true) {
             linkItem.displayLink?.let { copyLinkToClipboard(itemView.context, it) }
           }
         }
         itemView.setOnLongClickListener {
-          val linkItem = items[adapterPosition] as Item.LinkItem
+          val linkItem = items[bindingAdapterPosition] as Item.LinkItem
           linkItem.displayLink?.let { copyLinkToClipboard(itemView.context, it) }
           true
         }
       }
       ViewType.PERMISSIONS -> PermissionsViewHolder(parent.inflate(R.layout.permissions_item)).apply {
         itemView.setOnClickListener {
-          val permissionsItem = items[adapterPosition] as Item.PermissionsItem
+          val permissionsItem = items[bindingAdapterPosition] as Item.PermissionsItem
           callbacks.onPermissionsClick(permissionsItem.group?.name, permissionsItem.permissions.map { it.name })
         }
       }
       ViewType.SCREENSHOT -> ScreenshotViewHolder(parent.context).apply {
         itemView.setOnClickListener {
-          val screenshotItem = items[adapterPosition] as Item.ScreenshotItem
+          val screenshotItem = items[bindingAdapterPosition] as Item.ScreenshotItem
           callbacks.onScreenshotClick(screenshotItem.screenshot)
         }
       }
       ViewType.RELEASE -> ReleaseViewHolder(parent.inflate(R.layout.release_item)).apply {
         itemView.setOnClickListener {
-          val releaseItem = items[adapterPosition] as Item.ReleaseItem
+          val releaseItem = items[bindingAdapterPosition] as Item.ReleaseItem
           callbacks.onReleaseClick(releaseItem.release)
         }
       }
@@ -989,7 +1019,6 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
               holder.actionTintCancel else holder.actionTintNormal
           }
         }
-        if (updateAll || updateStatus) {
           val status = status
           holder.statusLayout.visibility = if (status != null) View.VISIBLE else View.GONE
           if (status != null) {
@@ -1013,8 +1042,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
               }
             }::class
           }
-        }
-        Unit
+          Unit
       }
       ViewType.SWITCH -> {
         holder as SwitchViewHolder
@@ -1094,10 +1122,10 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
           val labelFromPackage = PackageItemResolver.loadLabel(context, localCache, permission)
           val label = labelFromPackage ?: run {
             val prefixes = listOf("android.permission.", "com.android.browser.permission.")
-            prefixes.find { permission.name.startsWith(it) }?.let {
-              val transform = permission.name.substring(it.length)
+            prefixes.find { permission.name.startsWith(it) }?.let { it ->
+                val transform = permission.name.substring(it.length)
               if (transform.matches("[A-Z_]+".toRegex())) {
-                transform.split("_").joinToString(separator = " ") { it.toLowerCase(Locale.US) }
+                transform.split("_").joinToString(separator = " ") { it.lowercase(Locale.US) }
               } else {
                 null
               }
@@ -1106,7 +1134,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
           if (label == null) {
             Pair(false, permission.name)
           } else {
-            Pair(true, label.first().toUpperCase() + label.substring(1, label.length))
+            Pair(true, label.first().uppercaseChar() + label.substring(1, label.length))
           }
         }
         val builder = SpannableStringBuilder()
@@ -1171,7 +1199,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
         holder.signature.visibility = if (item.showSignature && item.release.signature.isNotEmpty())
           View.VISIBLE else View.GONE
         if (item.showSignature && item.release.signature.isNotEmpty()) {
-          val bytes = item.release.signature.toUpperCase(Locale.US).windowed(2, 2, false).take(8)
+          val bytes = item.release.signature.uppercase(Locale.US).windowed(2, 2, false).take(8)
           val signature = bytes.joinToString(separator = " ")
           val builder = SpannableStringBuilder(context.getString(R.string.signature_FORMAT, signature))
           val index = builder.indexOf(signature)
@@ -1255,7 +1283,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
     override fun onClick(view: View) {
       val productAdapter = productAdapterReference.get()
       val uri = try {
-        Uri.parse(url)
+          url.toUri()
       } catch (e: Exception) {
         e.printStackTrace()
         null

@@ -6,9 +6,9 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.view.ContextThemeWrapper
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.disposables.Disposable
@@ -29,6 +29,7 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import kotlin.math.*
+import androidx.core.net.toUri
 
 class DownloadService: ConnectionService<DownloadService.Binder>() {
   companion object {
@@ -47,14 +48,14 @@ class DownloadService: ConnectionService<DownloadService.Binder>() {
         action.startsWith("$ACTION_OPEN.") -> {
           val packageName = action.substring(ACTION_OPEN.length + 1)
           context.startActivity(Intent(context, MainActivity::class.java)
-            .setAction(Intent.ACTION_VIEW).setData(Uri.parse("package:$packageName"))
+            .setAction(Intent.ACTION_VIEW).setData("package:$packageName".toUri())
             .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
         action.startsWith("$ACTION_INSTALL.") -> {
           val packageName = action.substring(ACTION_INSTALL.length + 1)
           val cacheFileName = intent.getStringExtra(EXTRA_CACHE_FILE_NAME)
           context.startActivity(Intent(context, MainActivity::class.java)
-            .setAction(MainActivity.ACTION_INSTALL).setData(Uri.parse("package:$packageName"))
+            .setAction(MainActivity.ACTION_INSTALL).setData("package:$packageName".toUri())
             .putExtra(MainActivity.EXTRA_CACHE_FILE_NAME, cacheFileName)
             .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
@@ -189,8 +190,10 @@ class DownloadService: ConnectionService<DownloadService.Binder>() {
       .setSmallIcon(android.R.drawable.stat_sys_warning)
       .setColor(ContextThemeWrapper(this, R.style.Theme_Main_Light)
         .getColorFromAttr(android.R.attr.colorAccent).defaultColor)
-      .setContentIntent(PendingIntent.getBroadcast(this, 0, Intent(this, Receiver::class.java)
-        .setAction("$ACTION_OPEN.${task.packageName}"), PendingIntent.FLAG_UPDATE_CURRENT))
+      .setContentIntent(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java)
+        .setAction(Intent.ACTION_VIEW).setData("package:${task.packageName}".toUri())
+        .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_UPDATE_CURRENT or
+        Android.PendingIntent.FLAG_IMMUTABLE))
       .apply {
         when (errorType) {
           is ErrorType.Network -> {
@@ -223,9 +226,11 @@ class DownloadService: ConnectionService<DownloadService.Binder>() {
       .setSmallIcon(android.R.drawable.stat_sys_download_done)
       .setColor(ContextThemeWrapper(this, R.style.Theme_Main_Light)
         .getColorFromAttr(android.R.attr.colorAccent).defaultColor)
-      .setContentIntent(PendingIntent.getBroadcast(this, 0, Intent(this, Receiver::class.java)
-        .setAction("$ACTION_INSTALL.${task.packageName}")
-        .putExtra(EXTRA_CACHE_FILE_NAME, task.release.cacheFileName), PendingIntent.FLAG_UPDATE_CURRENT))
+      .setContentIntent(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java)
+        .setAction(MainActivity.ACTION_INSTALL).setData("package:${task.packageName}".toUri())
+        .putExtra(MainActivity.EXTRA_CACHE_FILE_NAME, task.release.cacheFileName)
+        .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_UPDATE_CURRENT or
+        Android.PendingIntent.FLAG_IMMUTABLE))
       .setContentTitle(getString(R.string.downloaded_FORMAT, task.name))
       .setContentText(getString(R.string.tap_to_install_DESC))
       .build())
@@ -243,12 +248,12 @@ class DownloadService: ConnectionService<DownloadService.Binder>() {
     val hash = try {
       val hashType = task.release.hashType.nullIfEmpty() ?: "SHA256"
       val digest = MessageDigest.getInstance(hashType)
-      file.inputStream().use {
-        val bytes = ByteArray(8 * 1024)
+      file.inputStream().use { it ->
+          val bytes = ByteArray(8 * 1024)
         generateSequence { it.read(bytes) }.takeWhile { it >= 0 }.forEach { digest.update(bytes, 0, it) }
         digest.digest().hex()
       }
-    } catch (e: Exception) {
+    } catch (_: Exception) {
       ""
     }
     return if (hash.isEmpty() || hash != task.release.hash) {
@@ -287,7 +292,8 @@ class DownloadService: ConnectionService<DownloadService.Binder>() {
     .setColor(ContextThemeWrapper(this, R.style.Theme_Main_Light)
       .getColorFromAttr(android.R.attr.colorAccent).defaultColor)
     .addAction(0, getString(R.string.cancel), PendingIntent.getService(this, 0,
-      Intent(this, this::class.java).setAction(ACTION_CANCEL), PendingIntent.FLAG_UPDATE_CURRENT)) }
+      Intent(this, this::class.java).setAction(ACTION_CANCEL), PendingIntent.FLAG_UPDATE_CURRENT or
+        Android.PendingIntent.FLAG_IMMUTABLE)) }
 
   private fun publishForegroundState(force: Boolean, state: State) {
     if (force || currentTask != null) {
@@ -313,7 +319,7 @@ class DownloadService: ConnectionService<DownloadService.Binder>() {
             throw IllegalStateException()
           }
         }::class
-      }.build())
+      }.build(), Android.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
       stateSubject.onNext(state)
     }
   }
@@ -361,7 +367,7 @@ class DownloadService: ConnectionService<DownloadService.Binder>() {
         currentTask = CurrentTask(task, disposable, initialState)
       } else if (started) {
         started = false
-        stopForeground(true)
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
       }
     }
