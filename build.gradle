@@ -13,11 +13,11 @@ buildscript {
 apply plugin: 'com.android.application'
 
 android {
-  namespace 'nya.kitsunyan.foxydroid'
+  namespace 'com.michatec.store'
   compileSdk 36
 
   defaultConfig {
-    applicationId 'nya.kitsunyan.foxydroid'
+    applicationId 'com.michatec.store'
     minSdk 30
     targetSdk 36
     versionCode 15

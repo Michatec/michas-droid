@@ -95,7 +95,7 @@
         android:fontFamily="monospace"
         android:textSize="16sp"
         android:inputType="textNoSuggestions|textMultiLine"
-        tools:ignore="Autofill,LabelFor" />
+        tools:ignore="Autofill,LabelFor,Speakable" />
 
       <TextView
         android:id="@+id/fingerprint_error"
