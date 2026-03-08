@@ -10,7 +10,7 @@
   <string name="always">Always</string>
   <string name="anti_features">Anti-features</string>
   <string name="application">Application</string>
-  <string name="application_name" translatable="false">Store</string>
+  <string name="application_name" translatable="false">Michas Store</string>
   <string name="application_not_found">Application not found</string>
   <string name="author_email">Author email</string>
   <string name="author_website">Author website</string>
@@ -164,5 +164,7 @@
   <string name="waiting_to_start_download">Waiting to start download</string>
   <string name="website">Website</string>
   <string name="address_redirect_FORMAT">The repository address was redirected to %s. Do you want to use it instead?</string>
+  <string name="credits">Credits to Michatec</string>
+  <string name="credits_to_fork">This is a fork from github.com/kitsunyan/foxy-droid.</string>
 
 </resources>

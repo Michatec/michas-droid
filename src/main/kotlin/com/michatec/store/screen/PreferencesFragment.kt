@@ -86,6 +86,21 @@ class PreferencesFragment: ScreenFragment() {
       addSwitch(Preferences.Key.IncompatibleVersions, getString(R.string.incompatible_versions),
         getString(R.string.incompatible_versions_summary))
     }
+    preferencesLayout.addCategory("Credits") {
+      val texts = 16f
+      addView(TextView(context).apply {
+        setText(R.string.credits)
+        textSize = texts
+        setPadding(resources.sizeScaled(16), resources.sizeScaled(16), 0, resources.sizeScaled(8))
+        setTextColor(context.getColorFromAttr(android.R.attr.textColorPrimary))
+      })
+      addView(TextView(context).apply {
+        setText(R.string.credits_to_fork)
+        textSize = texts
+        setPadding(resources.sizeScaled(16), resources.sizeScaled(16), 0, resources.sizeScaled(14))
+        setTextColor(context.getColorFromAttr(android.R.attr.textColorPrimary))
+      })
+    }
 
     disposable = Preferences.observable
       .observeOn(AndroidSchedulers.mainThread())

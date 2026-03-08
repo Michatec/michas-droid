@@ -43,6 +43,18 @@ android {
     targetCompatibility JavaVersion.VERSION_17
   }
 
+  flavorDimensions "distributor"
+  productFlavors {
+    michas {
+      dimension "distributor"
+      buildConfigField "boolean", "FLAVOR_FDROID", "false"
+    }
+    fdroid {
+      dimension "distributor"
+      buildConfigField "boolean", "FLAVOR_FDROID", "true"
+    }
+  }
+
   buildTypes {
     debug {
       minifyEnabled false
