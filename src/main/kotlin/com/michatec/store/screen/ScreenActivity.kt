@@ -125,7 +125,7 @@ abstract class ScreenActivity: FragmentActivity() {
 
   private fun replaceFragment(fragment: Fragment, open: Boolean?) {
     if (open != null) {
-      currentFragment?.view?.translationZ = (if (open) Int.MIN_VALUE else Int.MAX_VALUE).toFloat()
+      currentFragment?.view?.translationZ = (if (open) -1f else 1f)
     }
     supportFragmentManager
       .beginTransaction()

@@ -283,13 +283,15 @@ class TabsFragment: ScreenFragment() {
     }
     this.sectionsList = sectionsList
 
-    val lastContentHeight = -1
+    var lastContentHeight = -1
+    var initial = true
     content.viewTreeObserver.addOnGlobalLayoutListener {
       if (this.view != null) {
-        val initial = true
         val contentHeight = content.height
         if (lastContentHeight != contentHeight) {
-            if (initial) {
+          lastContentHeight = contentHeight
+          if (initial) {
+            initial = false
             sectionsList.layoutParams.height = if (showSections) contentHeight else 0
             sectionsList.visibility = if (showSections) View.VISIBLE else View.GONE
             sectionsList.requestLayout()
