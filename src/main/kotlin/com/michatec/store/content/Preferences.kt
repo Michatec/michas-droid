@@ -16,10 +16,12 @@ object Preferences {
 
   private val subject = PublishSubject.create<Key<*>>()
 
-  private val keys = sequenceOf(Key.AutoSync, Key.IncompatibleVersions, Key.ProxyHost, Key.ProxyPort, Key.ProxyType,
-    Key.SortOrder, Key.Theme, Key.UpdateNotify, Key.UpdateUnstable).map { Pair(it.name, it) }.toMap()
+  private val keys = sequenceOf(
+      Key.AutoSync, Key.IncompatibleVersions, Key.ProxyHost, Key.ProxyPort, Key.ProxyType,
+      Key.SortOrder, Key.Theme, Key.UpdateNotify, Key.UpdateUnstable
+  ).associateBy { it.name }
 
-  private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, keyString ->
+    private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, keyString ->
     keys[keyString]?.let(subject::onNext)
   }
 

@@ -33,9 +33,8 @@ abstract class CursorRecyclerAdapter<VT: Enum<VT>, VH: RecyclerView.ViewHolder>:
       return
     }
 
-    // Further reduced threshold to 100 for DiffUtil to avoid any noticeable frame drops on the main thread.
-    // JSON parsing and DB access during diffing are slow.
-    if (oldSize > 100 || newSize > 100) {
+    // Increased threshold for DiffUtil and optimized callback
+    if (oldSize > 500 || newSize > 500) {
         notifyDataSetChanged()
         return
     }
@@ -60,7 +59,6 @@ abstract class CursorRecyclerAdapter<VT: Enum<VT>, VH: RecyclerView.ViewHolder>:
         })
         diffResult.dispatchUpdatesTo(this)
     } catch (_: Exception) {
-        // Fallback in case of cursor issues during diffing
         notifyDataSetChanged()
     }
   }

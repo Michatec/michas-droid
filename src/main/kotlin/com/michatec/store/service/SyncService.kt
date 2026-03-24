@@ -331,7 +331,7 @@ class SyncService: ConnectionService<SyncService.Binder>() {
               currentTask = null
               handleNextTask(false)
               val blocked = updateNotificationBlockerFragment?.get()?.isAdded == true
-              if (!blocked && result != null && result.isNotEmpty()) {
+              if (!blocked && !result.isNullOrEmpty()) {
                 displayUpdatesNotification(result)
               }
             }

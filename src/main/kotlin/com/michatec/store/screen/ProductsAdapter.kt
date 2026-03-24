@@ -196,6 +196,12 @@ class ProductsAdapter(private val onClick: (ProductItem) -> Unit):
     }
   }
 
+  override fun areContentsTheSame(oldCursor: Cursor, newCursor: Cursor): Boolean {
+    val oldItem = Database.ProductAdapter.transformItem(oldCursor)
+    val newItem = Database.ProductAdapter.transformItem(newCursor)
+    return oldItem == newItem
+  }
+
   @SuppressLint("NotifyDataSetChanged")
   override fun onCursorChanged(oldCursor: Cursor?, newCursor: Cursor?) {
     val oldSize = oldCursor?.count ?: 0

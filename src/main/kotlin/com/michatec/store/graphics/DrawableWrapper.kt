@@ -74,5 +74,6 @@ open class DrawableWrapper(val drawable: Drawable): Drawable() {
     DrawableCompat.setHotspotBounds(drawable, left, top, right, bottom)
   }
 
+  @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
   override fun getOpacity(): Int = drawable.opacity
 }

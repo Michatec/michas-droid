@@ -1,7 +1,6 @@
 package com.michatec.store.utility
 
 import android.animation.ValueAnimator
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.Signature
 import android.content.res.Configuration
@@ -67,17 +66,11 @@ object Utils {
     }
   }
 
-  @SuppressLint("SuspiciousIndentation")
   fun configureLocale(context: Context): Context {
     val supportedLanguages = BuildConfig.LANGUAGES.toSet()
     val configuration = context.resources.configuration
-    val currentLocales = if (Android.sdk(24)) {
-      val localesList = configuration.locales
-      (0 until localesList.size()).map(localesList::get)
-    } else {
-      @Suppress("DEPRECATION")
-      listOf(configuration.locale)
-    }
+    val localesList = configuration.locales
+    val currentLocales = (0 until localesList.size()).map(localesList::get)
     val compatibleLocales = currentLocales
       .filter { it.language in supportedLanguages }
       .let { it.ifEmpty { listOf(Locale.US) } }

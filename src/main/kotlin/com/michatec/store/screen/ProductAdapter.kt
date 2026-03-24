@@ -362,10 +362,10 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
     }
   }
 
+  @SuppressLint("ClickableViewAccessibility")
   private open class OverlappingViewHolder(itemView: View): RecyclerView.ViewHolder(itemView) {
     init {
       // Block touch events if touched above negative margin
-      @SuppressLint("ClickableViewAccessibility")
       itemView.setOnTouchListener { v, event ->
         val top = (v.layoutParams as ViewGroup.MarginLayoutParams).topMargin
           event.action == MotionEvent.ACTION_DOWN && top < 0 && event.y < -top
@@ -373,6 +373,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
     }
   }
 
+  @SuppressLint("SetTextI18n")
   private class LinkViewHolder(itemView: View): OverlappingViewHolder(itemView) {
     companion object {
       private val measurement = Measurement<Int>()
@@ -384,7 +385,6 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
 
     init {
       val margin = measurement.invalidate(itemView.resources) {
-        @SuppressLint("SetTextI18n")
         text.text = "measure"
         link.visibility = View.GONE
         measurement.measure(itemView)
@@ -397,6 +397,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
     }
   }
 
+  @SuppressLint("SetTextI18n")
   private class PermissionsViewHolder(itemView: View): OverlappingViewHolder(itemView) {
     companion object {
       private val measurement = Measurement<Int>()
@@ -407,7 +408,6 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
 
     init {
       val margin = measurement.invalidate(itemView.resources) {
-        @SuppressLint("SetTextI18n")
         text.text = "measure"
         measurement.measure(itemView)
         ((itemView.measuredHeight - icon.measuredHeight) / 2f).roundToInt()

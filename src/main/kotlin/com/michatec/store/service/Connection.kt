@@ -19,11 +19,11 @@ class Connection<B: IBinder, S: ConnectionService<B>>(private val serviceClass: 
     }
   }
 
+  @Suppress("UNCHECKED_CAST")
   override fun onServiceConnected(componentName: ComponentName, binder: IBinder) {
-    @Suppress("UNCHECKED_CAST")
-    binder as B
-    this.binder = binder
-    onBind?.invoke(this, binder)
+    val b = binder as B
+    this.binder = b
+    onBind?.invoke(this, b)
   }
 
   override fun onServiceDisconnected(componentName: ComponentName) {

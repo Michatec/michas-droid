@@ -12,7 +12,7 @@ import okhttp3.Response
 
 object RxUtils {
   private class ManagedDisposable(private val cancel: () -> Unit): Disposable {
-    @Volatile var disposed = false
+    var disposed = false
     override fun isDisposed(): Boolean = disposed
 
     override fun dispose() {

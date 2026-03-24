@@ -260,6 +260,6 @@ class IndexHandler(private val repositoryId: Long, private val callback: Callbac
 
   override fun characters(ch: CharArray, start: Int, length: Int) {
     super.characters(ch, start, length)
-    contentBuilder.append(ch, start, length)
+    contentBuilder.appendRange(ch, start, start + length)
   }
 }

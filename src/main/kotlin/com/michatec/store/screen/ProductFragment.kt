@@ -148,8 +148,8 @@ class ProductFragment(): ScreenFragment(), ProductAdapter.Callbacks {
       .flatMapSingle { products -> RxUtils
         .querySingle { signal -> Database.RepositoryAdapter.getAll(signal) }
         .map { result ->
-            result.asSequence().map { Pair(it.id, it) }.toMap()
-          .let { map -> products.mapNotNull { product -> map[product.repositoryId]?.let { Pair(product, it) } } } } }
+            result.associateBy { it.id }
+                .let { map -> products.mapNotNull { product -> map[product.repositoryId]?.let { Pair(product, it) } } } } }
       .flatMapSingle { products -> RxUtils
         .querySingle { signal -> Nullable(Database.InstalledAdapter.get(packageName, signal)) }
         .map { result -> Pair(products, result) } }
@@ -396,9 +396,9 @@ class ProductFragment(): ScreenFragment(), ProductAdapter.Callbacks {
 
   override fun onScreenshotClick(screenshot: Product.Screenshot) {
     val pair = products.asSequence()
-      .map { it -> Pair(it.second, it.first.screenshots.find { it === screenshot }?.identifier) }
-      .filter { it.second != null }.firstOrNull()
-    if (pair != null) {
+        .map { it -> Pair(it.second, it.first.screenshots.find { it === screenshot }?.identifier) }
+        .firstOrNull { it.second != null }
+      if (pair != null) {
       val (repository, identifier) = pair
       if (identifier != null) {
         ScreenshotsFragment(packageName, repository.id, identifier).show(childFragmentManager)
@@ -420,8 +420,9 @@ class ProductFragment(): ScreenFragment(), ProductAdapter.Callbacks {
         MessageDialog(MessageDialog.Message.ReleaseSignatureMismatch).show(childFragmentManager)
       }
       else -> {
-        val productRepository = products.asSequence().filter { it -> it.first.releases.any { it === release } }.firstOrNull()
-        if (productRepository != null) {
+        val productRepository =
+            products.firstOrNull { it -> it.first.releases.any { it === release } }
+          if (productRepository != null) {
           downloadConnection.binder?.enqueue(packageName, productRepository.first.name,
             productRepository.second, release)
         }
