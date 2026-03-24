@@ -2,6 +2,7 @@ buildscript {
   repositories {
     google()
     mavenCentral()
+    maven { url 'https://jitpack.io' }
   }
 
   dependencies {
@@ -95,6 +96,7 @@ android {
 repositories {
   google()
   mavenCentral()
+  maven { url 'https://jitpack.io' }
 }
 
 dependencies {
@@ -107,4 +109,5 @@ dependencies {
   implementation 'io.reactivex.rxjava3:rxandroid:3.0.2'
   implementation 'com.fasterxml.jackson.core:jackson-core:2.21.1'
   implementation 'com.squareup.picasso:picasso:2.71828'
+  implementation 'com.github.woheller69:FreeDroidWarn:V1.10'
 }
