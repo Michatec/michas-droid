@@ -14,6 +14,7 @@ import androidx.core.os.BundleCompat
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
+import com.michatec.store.BuildConfig
 import com.michatec.store.R
 import com.michatec.store.content.Cache
 import com.michatec.store.content.Preferences
@@ -23,6 +24,7 @@ import com.michatec.store.utility.Utils
 import com.michatec.store.utility.extension.android.*
 import com.michatec.store.utility.extension.resources.*
 import com.michatec.store.utility.extension.text.*
+import org.woheller69.freeDroidWarn.FreeDroidWarn
 
 abstract class ScreenActivity: FragmentActivity() {
   companion object {
@@ -73,6 +75,8 @@ abstract class ScreenActivity: FragmentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     setTheme(Preferences[Preferences.Key.Theme].getResId(resources.configuration))
     super.onCreate(savedInstanceState)
+
+    FreeDroidWarn.showWarningOnUpgrade(this, BuildConfig.VERSION_CODE)
 
     WindowCompat.setDecorFitsSystemWindows(window, false)
     addContentView(FrameLayout(this).apply { id = R.id.main_content },

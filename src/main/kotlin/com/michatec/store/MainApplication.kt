@@ -27,7 +27,6 @@ import com.michatec.store.utility.Utils
 import com.michatec.store.utility.extension.android.*
 import java.net.InetSocketAddress
 import java.net.Proxy
-import org.woheller69.freeDroidWarn.FreeDroidWarn
 
 class MainApplication: Application() {
   private fun PackageInfo.toInstalledItem(): InstalledItem {
@@ -43,8 +42,7 @@ class MainApplication: Application() {
 
   override fun onCreate() {
     super.onCreate()
-    FreeDroidWarn.showWarningOnUpgrade(this, BuildConfig.VERSION_CODE)
-    
+
     val databaseUpdated = Database.init(this)
     Preferences.init(this)
     ProductPreferences.init(this)
