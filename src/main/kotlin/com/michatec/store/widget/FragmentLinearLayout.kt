@@ -12,11 +12,4 @@ class FragmentLinearLayout: LinearLayout {
   init {
     fitsSystemWindows = true
   }
-
-  @Suppress("unused")
-  var percentTranslationY: Float
-    get() = height.let { if (it > 0) translationY / it else 0f }
-    set(value) {
-      translationY = value * height
-    }
 }

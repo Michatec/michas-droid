@@ -12,3 +12,4 @@
 !/proguard.pro
 !/README.md
 !/src
+/gradle/gradle-daemon-jvm.properties
