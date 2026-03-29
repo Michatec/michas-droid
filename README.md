@@ -5,7 +5,7 @@
 	<a href="https://github.com/michatec/michas-droid/releases"><img src="https://img.shields.io/github/downloads/michatec/michas-droid/total.svg?style=flat-square" /></a>
 	<a href="https://github.com/michatec/michas-droid/issues"><img src="https://img.shields.io/github/issues-raw/michatec/michas-droid.svg?style=flat-square&label=issues" /></a>
 	<a href="https://github.com/michatec/michas-droid/graphs/contributors"><img src="https://img.shields.io/github/contributors/michatec/michas-droid?style=flat-square" /></a>
-	<a href="https://github.com/michatec/michas-droid/blob/master/LICENSE"><img src="https://img.shields.io/github/license/michatec/michas-droid?style=flat-square" /></a>
+	<a href="https://github.com/michatec/michas-droid/blob/master/COPYING"><img src="https://img.shields.io/github/license/michatec/michas-droid?style=flat-square" /></a>
 </p>
 
 Yet another F-Droid client.
