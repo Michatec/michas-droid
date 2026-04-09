@@ -35,6 +35,7 @@ import android.widget.ProgressBar
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat.getString
 import androidx.core.graphics.ColorUtils
 import androidx.core.text.HtmlCompat
 import androidx.core.text.util.LinkifyCompat
@@ -373,7 +374,6 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
     }
   }
 
-  @SuppressLint("SetTextI18n")
   private class LinkViewHolder(itemView: View): OverlappingViewHolder(itemView) {
     companion object {
       private val measurement = Measurement<Int>()
@@ -385,7 +385,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
 
     init {
       val margin = measurement.invalidate(itemView.resources) {
-        text.text = "measure"
+        text.text = itemView.context.getString(R.string.measure)
         link.visibility = View.GONE
         measurement.measure(itemView)
         ((itemView.measuredHeight - icon.measuredHeight) / 2f).roundToInt()
@@ -397,7 +397,6 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
     }
   }
 
-  @SuppressLint("SetTextI18n")
   private class PermissionsViewHolder(itemView: View): OverlappingViewHolder(itemView) {
     companion object {
       private val measurement = Measurement<Int>()
@@ -408,7 +407,7 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
 
     init {
       val margin = measurement.invalidate(itemView.resources) {
-        text.text = "measure"
+        text.text = itemView.context.getString(R.string.measure)
         measurement.measure(itemView)
         ((itemView.measuredHeight - icon.measuredHeight) / 2f).roundToInt()
       }

@@ -34,15 +34,6 @@ or sharing local repositories nearby.
 Specify your Android SDK path either using the `ANDROID_HOME` environment variable, or by filling out the `sdk.dir`
 property in `local.properties`.
 
-Signing can be done automatically using `keystore.properties` as follows:
-
-```properties
-store.file=/path/to/keystore
-store.password=key-store-password
-key.alias=key-alias
-key.password=key-password
-```
-
 Run `./gradlew assembleRelease` to build the package, which can be installed using the Android package manager.
 
 ## License

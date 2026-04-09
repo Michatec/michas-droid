@@ -75,8 +75,9 @@ object Utils {
       .filter { it.language in supportedLanguages }
       .let { it.ifEmpty { listOf(Locale.US) } }
     Locale.setDefault(compatibleLocales.first())
-    val newConfiguration = Configuration(configuration)
-      newConfiguration.setLocales(LocaleList(*compatibleLocales.toTypedArray()))
+    val newConfiguration = Configuration(configuration).apply {
+      setLocales(LocaleList(*compatibleLocales.toTypedArray()))
+    }
     return context.createConfigurationContext(newConfiguration)
   }
 

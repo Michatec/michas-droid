@@ -39,7 +39,7 @@ open class DrawableWrapper(val drawable: Drawable): Drawable() {
   }
 
   override fun getAlpha(): Int {
-    return DrawableCompat.getAlpha(drawable)
+    return drawable.alpha
   }
 
   override fun setAlpha(alpha: Int) {

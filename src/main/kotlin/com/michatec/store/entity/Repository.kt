@@ -89,6 +89,12 @@ data class Repository(
             "Michachatz official repository. Everything in this repository is always built from the source code.",
             21, true, "3546DCBDD900F280EE2161CC163C1156BE2C2F3EB810415115039E0C7D3242C0", ""
           ),
+          if (isFdroid) null else defaultRepository(
+            "https://repo.dgplayser.duckdns.org/fdroid/archive",
+            "Michachatz F-Droid Repo",
+            "Michachatz official repository. Everything in this repository is always built from the source code.",
+            21, true, "3546DCBDD900F280EE2161CC163C1156BE2C2F3EB810415115039E0C7D3242C0 ", ""
+          ),
           defaultRepository(
             "https://f-droid.org/repo",
             "F-Droid",

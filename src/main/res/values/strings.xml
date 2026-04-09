@@ -166,5 +166,6 @@
   <string name="address_redirect_FORMAT">The repository address was redirected to %s. Do you want to use it instead?</string>
   <string name="credits">Credits to Michatec</string>
   <string name="credits_to_fork">This is a fork from github.com/kitsunyan/foxy-droid.</string>
+  <string name="measure" translatable="false">measure</string>
 
 </resources>
