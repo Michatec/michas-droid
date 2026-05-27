@@ -2,7 +2,7 @@
 core-ktx = "1.18.0"
 fragment-ktx = "1.8.9"
 freedroidwarn = "V1.10"
-gradle = "9.1.0"
+gradle = "9.2.1"
 jackson-core = "2.21.2"
 kotlin = "2.3.20"
 okhttp = "5.3.2"
