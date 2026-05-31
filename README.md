@@ -51,4 +51,6 @@ Run `./gradlew assembleRelease` to build the package, which can be installed usi
 
 ## License
 
-Michas Droid is available under the terms of the GNU General Public License v3 or later. Copyright © 2026 Michatec.
+Michas Droid is available under the terms of the GNU General Public License v3 or later. 
+
+Copyright © 2026 Michatec.

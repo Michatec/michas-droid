@@ -35,8 +35,8 @@ import android.widget.ProgressBar
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
-import androidx.core.content.ContextCompat.getString
 import androidx.core.graphics.ColorUtils
+import androidx.core.net.toUri
 import androidx.core.text.HtmlCompat
 import androidx.core.text.util.LinkifyCompat
 import androidx.recyclerview.widget.DiffUtil
@@ -54,16 +54,24 @@ import com.michatec.store.network.PicassoDownloader
 import com.michatec.store.utility.KParcelable
 import com.michatec.store.utility.PackageItemResolver
 import com.michatec.store.utility.Utils
-import com.michatec.store.utility.extension.android.*
-import com.michatec.store.utility.extension.resources.*
-import com.michatec.store.utility.extension.text.*
+import com.michatec.store.utility.extension.android.Android
+import com.michatec.store.utility.extension.resources.TypefaceExtra
+import com.michatec.store.utility.extension.resources.clear
+import com.michatec.store.utility.extension.resources.getColorFromAttr
+import com.michatec.store.utility.extension.resources.getDrawableCompat
+import com.michatec.store.utility.extension.resources.getDrawableFromAttr
+import com.michatec.store.utility.extension.resources.inflate
+import com.michatec.store.utility.extension.resources.load
+import com.michatec.store.utility.extension.resources.setTextSizeScaled
+import com.michatec.store.utility.extension.resources.sizeScaled
+import com.michatec.store.utility.extension.text.formatSize
+import com.michatec.store.utility.extension.text.nullIfEmpty
 import com.michatec.store.widget.ClickableMovementMethod
 import com.michatec.store.widget.DividerItemDecoration
 import com.michatec.store.widget.StableRecyclerAdapter
 import java.lang.ref.WeakReference
 import java.util.Locale
-import kotlin.math.*
-import androidx.core.net.toUri
+import kotlin.math.roundToInt
 
 class ProductAdapter(private val callbacks: Callbacks, private val columns: Int):
   StableRecyclerAdapter<ProductAdapter.ViewType, RecyclerView.ViewHolder>() {
