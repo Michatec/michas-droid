@@ -4,12 +4,12 @@ plugins {
 
 android {
     namespace = "com.michatec.store"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.michatec.store"
         minSdk = 30
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 18
         versionName = "1.8"
 
