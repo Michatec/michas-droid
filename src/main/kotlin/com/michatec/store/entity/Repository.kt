@@ -84,16 +84,16 @@ data class Repository(
         val isFdroid = BuildConfig.FLAVOR_FDROID
         return listOfNotNull(
           if (isFdroid) null else defaultRepository(
-            "https://repo.dgplayser.duckdns.org/fdroid/repo",
+            "https://repo.michachatz.qzz.io/fdroid/repo/",
             "Michachatz F-Droid Repo",
             "Michachatz official repository. Everything in this repository is always built from the source code.",
-            21, true, "3546DCBDD900F280EE2161CC163C1156BE2C2F3EB810415115039E0C7D3242C0", ""
+            21, true, "C14EECD320E9119B8C9EB8603E828DE5E2AF7278DD6A1491C87F25C507E6BA98", ""
           ),
           if (isFdroid) null else defaultRepository(
-            "https://repo.dgplayser.duckdns.org/fdroid/archive",
+            "https://repo.michachatz.qzz.io/fdroid/archive",
             "Michachatz F-Droid Archive",
             "Michachatz official archive repository. Everything in this repository is always built from the source code.",
-            21, true, "3546DCBDD900F280EE2161CC163C1156BE2C2F3EB810415115039E0C7D3242C0 ", ""
+            21, true, "C14EECD320E9119B8C9EB8603E828DE5E2AF7278DD6A1491C87F25C507E6BA98 ", ""
           ),
           defaultRepository(
             "https://f-droid.org/repo",
