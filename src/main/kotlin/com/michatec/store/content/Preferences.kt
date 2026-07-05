@@ -88,6 +88,7 @@ object Preferences {
 
   sealed class Key<T>(val name: String, val default: Value<T>) {
     object AutoSync: Key<Preferences.AutoSync>("auto_sync", Value.EnumerationValue(Preferences.AutoSync.Wifi))
+    object ExpandScreenshots: Key<Boolean>("expand_screenshots", Value.BooleanValue(true))
     object IncompatibleVersions: Key<Boolean>("incompatible_versions", Value.BooleanValue(false))
     object ProxyHost: Key<String>("proxy_host", Value.StringValue("localhost"))
     object ProxyPort: Key<Int>("proxy_port", Value.IntValue(9050))

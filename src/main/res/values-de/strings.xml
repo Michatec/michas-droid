@@ -38,6 +38,8 @@
     <string name="downloading">Wird heruntergeladen</string>
     <string name="downloading_FORMAT">Lade %s herunter</string>
     <string name="edit_repository">Repository bearbeiten</string>
+    <string name="expand_screenshots">Screenshots automatisch ausklappen</string>
+    <string name="expand_screenshots_summary">Screenshots in den App-Details automatisch anzeigen</string>
     <string name="file_format_error_DESC">Ungültiges Dateiformat.</string>
     <string name="fingerprint">Fingerabdruck</string>
     <string name="has_advertising">Enthält Werbung</string>

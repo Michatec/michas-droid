@@ -85,6 +85,8 @@ class PreferencesFragment: ScreenFragment() {
       }
       addSwitch(Preferences.Key.IncompatibleVersions, getString(R.string.incompatible_versions),
         getString(R.string.incompatible_versions_summary))
+      addSwitch(Preferences.Key.ExpandScreenshots, getString(R.string.expand_screenshots),
+        getString(R.string.expand_screenshots_summary))
     }
     preferencesLayout.addCategory("Credits") {
       val texts = 16f

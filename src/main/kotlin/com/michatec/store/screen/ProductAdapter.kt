@@ -593,7 +593,8 @@ class ProductAdapter(private val callbacks: Callbacks, private val columns: Int)
   }
 
   private val items = mutableListOf<Item>()
-  private val expanded = mutableSetOf<ExpandType>()
+  private val expanded = if (Preferences[Preferences.Key.ExpandScreenshots])
+    mutableSetOf(ExpandType.SCREENSHOTS) else mutableSetOf<ExpandType>()
   private var product: Product? = null
   private var installedItem: InstalledItem? = null
 

@@ -39,6 +39,8 @@
   <string name="downloading">Downloading</string>
   <string name="downloading_FORMAT">Downloading %s</string>
   <string name="edit_repository">Edit repository</string>
+  <string name="expand_screenshots">Expand screenshots</string>
+  <string name="expand_screenshots_summary">Automatically expand screenshots in app details</string>
   <string name="file_format_error_DESC">Invalid file format.</string>
   <string name="fingerprint">Fingerprint</string>
   <string name="has_advertising">Has advertising</string>
