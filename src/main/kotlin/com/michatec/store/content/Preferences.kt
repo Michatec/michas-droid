@@ -17,7 +17,7 @@ object Preferences {
   private val subject = PublishSubject.create<Key<*>>()
 
   private val keys = sequenceOf(
-      Key.AutoSync, Key.IncompatibleVersions, Key.ProxyHost, Key.ProxyPort, Key.ProxyType,
+      Key.AutoSync, Key.ExpandScreenshots, Key.IncompatibleVersions, Key.ProxyHost, Key.ProxyPort, Key.ProxyType,
       Key.SortOrder, Key.Theme, Key.UpdateNotify, Key.UpdateUnstable
   ).associateBy { it.name }
 
