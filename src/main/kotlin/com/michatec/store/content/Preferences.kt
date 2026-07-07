@@ -17,7 +17,7 @@ object Preferences {
   private val subject = PublishSubject.create<Key<*>>()
 
   private val keys = sequenceOf(
-      Key.AutoSync, Key.IncompatibleVersions, Key.ProxyHost, Key.ProxyPort, Key.ProxyType,
+      Key.AutoSync, Key.ExpandScreenshots, Key.IncompatibleVersions, Key.ProxyHost, Key.ProxyPort, Key.ProxyType,
       Key.SortOrder, Key.Theme, Key.UpdateNotify, Key.UpdateUnstable
   ).associateBy { it.name }
 
@@ -88,6 +88,7 @@ object Preferences {
 
   sealed class Key<T>(val name: String, val default: Value<T>) {
     object AutoSync: Key<Preferences.AutoSync>("auto_sync", Value.EnumerationValue(Preferences.AutoSync.Wifi))
+    object ExpandScreenshots: Key<Boolean>("expand_screenshots", Value.BooleanValue(true))
     object IncompatibleVersions: Key<Boolean>("incompatible_versions", Value.BooleanValue(false))
     object ProxyHost: Key<String>("proxy_host", Value.StringValue("localhost"))
     object ProxyPort: Key<Int>("proxy_port", Value.IntValue(9050))
